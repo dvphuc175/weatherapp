@@ -10,13 +10,28 @@ public class WeatherResponse {
     @SerializedName("weather")
     private List<WeatherDescription> weather;
 
-    // THÊM BIẾN NÀY VÀO
     @SerializedName("name")
     private String name;
 
+    @SerializedName("wind")
+    private Wind wind;
+
+    @SerializedName("sys")
+    private Sys sys;
+
+    /** Visibility in meters. -1 / 0 are treated as missing by the UI. */
+    @SerializedName("visibility")
+    private int visibility;
+
+    /** City timezone offset from UTC, in seconds. Needed to render sunrise/sunset in city local time. */
+    @SerializedName("timezone")
+    private int timezone;
+
     public CurrentWeather getMain() { return main; }
     public List<WeatherDescription> getWeather() { return weather; }
-
-    // THÊM HÀM GET NÀY VÀO
     public String getName() { return name; }
+    public Wind getWind() { return wind; }
+    public Sys getSys() { return sys; }
+    public int getVisibility() { return visibility; }
+    public int getTimezone() { return timezone; }
 }

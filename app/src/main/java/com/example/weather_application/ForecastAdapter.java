@@ -81,6 +81,17 @@ public class ForecastAdapter extends RecyclerView.Adapter<ForecastAdapter.Foreca
                 : null;
         holder.lavForecastIcon.setAnimation(WeatherIconMapper.rawForIconCode(iconCode));
         holder.lavForecastIcon.playAnimation();
+
+        // Hide pop% when API didn't send it or when chance is too low to be useful (< 10%).
+        Double pop = item.getPop();
+        if (pop != null && pop >= 0.1) {
+            int percent = (int) Math.round(pop * 100d);
+            holder.tvForecastPop.setText(
+                    context.getString(R.string.pop_value_format, percent));
+            holder.tvForecastPop.setVisibility(View.VISIBLE);
+        } else {
+            holder.tvForecastPop.setVisibility(View.GONE);
+        }
     }
 
     @Override
@@ -103,6 +114,7 @@ public class ForecastAdapter extends RecyclerView.Adapter<ForecastAdapter.Foreca
         final TextView tvDate;
         final TextView tvTime;
         final TextView tvForecastTemp;
+        final TextView tvForecastPop;
         final LottieAnimationView lavForecastIcon;
 
         public ForecastViewHolder(@NonNull View itemView) {
@@ -110,6 +122,7 @@ public class ForecastAdapter extends RecyclerView.Adapter<ForecastAdapter.Foreca
             tvDate = itemView.findViewById(R.id.tvDate);
             tvTime = itemView.findViewById(R.id.tvTime);
             tvForecastTemp = itemView.findViewById(R.id.tvForecastTemp);
+            tvForecastPop = itemView.findViewById(R.id.tvForecastPop);
             lavForecastIcon = itemView.findViewById(R.id.lavForecastIcon);
         }
     }

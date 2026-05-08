@@ -13,23 +13,31 @@ public final class WeatherUiState {
     private final boolean isCurrentLocation;
     @Nullable
     private final String errorMessage;
+    private final boolean loading;
 
     private WeatherUiState(@Nullable WeatherResponse data,
                            boolean isCurrentLocation,
-                           @Nullable String errorMessage) {
+                           @Nullable String errorMessage,
+                           boolean loading) {
         this.data = data;
         this.isCurrentLocation = isCurrentLocation;
         this.errorMessage = errorMessage;
+        this.loading = loading;
+    }
+
+    @NonNull
+    public static WeatherUiState loading() {
+        return new WeatherUiState(null, false, null, true);
     }
 
     @NonNull
     public static WeatherUiState success(@NonNull WeatherResponse data, boolean isCurrentLocation) {
-        return new WeatherUiState(data, isCurrentLocation, null);
+        return new WeatherUiState(data, isCurrentLocation, null, false);
     }
 
     @NonNull
     public static WeatherUiState error(@NonNull String message) {
-        return new WeatherUiState(null, false, message);
+        return new WeatherUiState(null, false, message, false);
     }
 
     @Nullable
@@ -48,5 +56,9 @@ public final class WeatherUiState {
 
     public boolean isError() {
         return errorMessage != null;
+    }
+
+    public boolean isLoading() {
+        return loading;
     }
 }

@@ -15,20 +15,29 @@ public final class ForecastUiState {
     private final List<ForecastItem> items;
     @Nullable
     private final String errorMessage;
+    private final boolean loading;
 
-    private ForecastUiState(@NonNull List<ForecastItem> items, @Nullable String errorMessage) {
+    private ForecastUiState(@NonNull List<ForecastItem> items,
+                            @Nullable String errorMessage,
+                            boolean loading) {
         this.items = items;
         this.errorMessage = errorMessage;
+        this.loading = loading;
+    }
+
+    @NonNull
+    public static ForecastUiState loading() {
+        return new ForecastUiState(Collections.<ForecastItem>emptyList(), null, true);
     }
 
     @NonNull
     public static ForecastUiState success(@NonNull List<ForecastItem> items) {
-        return new ForecastUiState(items, null);
+        return new ForecastUiState(items, null, false);
     }
 
     @NonNull
     public static ForecastUiState error(@NonNull String message) {
-        return new ForecastUiState(Collections.<ForecastItem>emptyList(), message);
+        return new ForecastUiState(Collections.<ForecastItem>emptyList(), message, false);
     }
 
     @NonNull
@@ -43,5 +52,9 @@ public final class ForecastUiState {
 
     public boolean isError() {
         return errorMessage != null;
+    }
+
+    public boolean isLoading() {
+        return loading;
     }
 }

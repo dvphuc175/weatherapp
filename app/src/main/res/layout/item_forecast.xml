@@ -45,4 +45,15 @@
         android:textSize="16sp"
         android:textStyle="bold"
         tools:text="25°C"/>
+
+    <TextView
+        android:id="@+id/tvForecastPop"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/text_secondary_on_brand"
+        android:textSize="11sp"
+        android:layout_marginTop="2dp"
+        android:visibility="gone"
+        tools:visibility="visible"
+        tools:text="💧 40%"/>
 </LinearLayout>

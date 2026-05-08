@@ -14,6 +14,27 @@
     <!-- Card labels -->
     <string name="humidity_label">Độ ẩm</string>
     <string name="feels_like_label">Cảm giác như</string>
+    <string name="wind_label">Gió</string>
+    <string name="pressure_label">Áp suất</string>
+    <string name="visibility_label">Tầm nhìn</string>
+    <string name="placeholder_dash">—</string>
+
+    <!-- Bình minh / Hoàng hôn -->
+    <string name="sunrise_placeholder">🌅 --:--</string>
+    <string name="sunset_placeholder">🌇 --:--</string>
+    <string name="sunrise_value_format">🌅 %1$s</string>
+    <string name="sunset_value_format">🌇 %1$s</string>
+
+    <!-- Định dạng giá trị -->
+    <string name="wind_value_format">%1$.1f m/s</string>
+    <string name="pressure_value_format">%1$d hPa</string>
+    <string name="visibility_value_km_format">%1$d km</string>
+    <string name="visibility_value_km_decimal_format">%1$.1f km</string>
+    <string name="pop_value_format">💧 %1$d%%</string>
+
+    <!-- Trạng thái loading / lỗi -->
+    <string name="error_default_message">Không tải được thời tiết. Vui lòng thử lại.</string>
+    <string name="retry_button">Thử lại</string>
 
     <!-- Chart -->
     <string name="chart_temp_trend_label">Xu hướng nhiệt độ 24h</string>

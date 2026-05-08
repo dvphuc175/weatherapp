@@ -33,6 +33,10 @@ public class MainViewModel extends ViewModel {
      */
     private int loadGeneration;
 
+    /** Last successful query, kept so {@link #refresh()} can re-issue it (e.g. pull-to-refresh, retry). */
+    @Nullable
+    private LastQuery lastQuery;
+
     public MainViewModel() {
         this(new WeatherRepository());
     }
@@ -52,15 +56,35 @@ public class MainViewModel extends ViewModel {
     }
 
     public void loadByCoord(double lat, double lon) {
+        lastQuery = LastQuery.coord(lat, lon);
         int gen = startNewGeneration();
+        weather.postValue(WeatherUiState.loading());
+        forecast.postValue(ForecastUiState.loading());
         track(repository.getCurrentWeatherByCoord(lat, lon, weatherCallback(true, gen)));
         track(repository.getForecastByCoord(lat, lon, forecastCallback(gen)));
     }
 
     public void loadByCity(@NonNull String city) {
+        lastQuery = LastQuery.city(city);
         int gen = startNewGeneration();
+        weather.postValue(WeatherUiState.loading());
+        forecast.postValue(ForecastUiState.loading());
         track(repository.getCurrentWeatherByCity(city, weatherCallback(false, gen)));
         track(repository.getForecastByCity(city, forecastCallback(gen)));
+    }
+
+    /**
+     * Re-issue the last successful query. Wired to pull-to-refresh and the inline error retry
+     * button. No-op if no query has been issued yet (e.g. permission still being requested).
+     */
+    public void refresh() {
+        LastQuery q = lastQuery;
+        if (q == null) return;
+        if (q.city != null) {
+            loadByCity(q.city);
+        } else {
+            loadByCoord(q.lat, q.lon);
+        }
     }
 
     @Override
@@ -122,5 +146,26 @@ public class MainViewModel extends ViewModel {
             c.cancel();
         }
         inFlight.clear();
+    }
+
+    /** Snapshot of the last issued query, used by {@link #refresh()}. */
+    private static final class LastQuery {
+        @Nullable final String city;
+        final double lat;
+        final double lon;
+
+        private LastQuery(@Nullable String city, double lat, double lon) {
+            this.city = city;
+            this.lat = lat;
+            this.lon = lon;
+        }
+
+        static LastQuery city(@NonNull String city) {
+            return new LastQuery(city, 0d, 0d);
+        }
+
+        static LastQuery coord(double lat, double lon) {
+            return new LastQuery(null, lat, lon);
+        }
     }
 }
