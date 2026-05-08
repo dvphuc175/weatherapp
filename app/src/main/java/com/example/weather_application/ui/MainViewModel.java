@@ -26,6 +26,13 @@ public class MainViewModel extends ViewModel {
 
     private final List<Cancellable> inFlight = new ArrayList<>();
 
+    /**
+     * Monotonically increases on every {@link #loadByCoord}/{@link #loadByCity}/{@link #cancelInFlight}.
+     * Callbacks captured before the bump are stale: they must drop their result instead of overwriting
+     * a newer state. Guards against the race where a slow first request finishes after a fresh one.
+     */
+    private int loadGeneration;
+
     public MainViewModel() {
         this(new WeatherRepository());
     }
@@ -45,15 +52,15 @@ public class MainViewModel extends ViewModel {
     }
 
     public void loadByCoord(double lat, double lon) {
-        cancelInFlight();
-        track(repository.getCurrentWeatherByCoord(lat, lon, weatherCallback(true)));
-        track(repository.getForecastByCoord(lat, lon, forecastCallback()));
+        int gen = startNewGeneration();
+        track(repository.getCurrentWeatherByCoord(lat, lon, weatherCallback(true, gen)));
+        track(repository.getForecastByCoord(lat, lon, forecastCallback(gen)));
     }
 
     public void loadByCity(@NonNull String city) {
-        cancelInFlight();
-        track(repository.getCurrentWeatherByCity(city, weatherCallback(false)));
-        track(repository.getForecastByCity(city, forecastCallback()));
+        int gen = startNewGeneration();
+        track(repository.getCurrentWeatherByCity(city, weatherCallback(false, gen)));
+        track(repository.getForecastByCity(city, forecastCallback(gen)));
     }
 
     @Override
@@ -62,24 +69,37 @@ public class MainViewModel extends ViewModel {
         cancelInFlight();
     }
 
-    private ResultCallback<WeatherResponse> weatherCallback(final boolean isCurrentLocation) {
+    private synchronized int startNewGeneration() {
+        cancelInFlight();
+        return ++loadGeneration;
+    }
+
+    private synchronized boolean isStale(int gen) {
+        return gen != loadGeneration;
+    }
+
+    private ResultCallback<WeatherResponse> weatherCallback(final boolean isCurrentLocation,
+                                                            final int gen) {
         return new ResultCallback<WeatherResponse>() {
             @Override
             public void onSuccess(@NonNull WeatherResponse data) {
+                if (isStale(gen)) return;
                 weather.postValue(WeatherUiState.success(data, isCurrentLocation));
             }
 
             @Override
             public void onError(@Nullable String message) {
+                if (isStale(gen)) return;
                 weather.postValue(WeatherUiState.error(message == null ? "" : message));
             }
         };
     }
 
-    private ResultCallback<ForecastResponse> forecastCallback() {
+    private ResultCallback<ForecastResponse> forecastCallback(final int gen) {
         return new ResultCallback<ForecastResponse>() {
             @Override
             public void onSuccess(@NonNull ForecastResponse data) {
+                if (isStale(gen)) return;
                 List<ForecastItem> items = data.getList();
                 forecast.postValue(ForecastUiState.success(
                         items == null ? Collections.<ForecastItem>emptyList() : items));
@@ -87,16 +107,17 @@ public class MainViewModel extends ViewModel {
 
             @Override
             public void onError(@Nullable String message) {
+                if (isStale(gen)) return;
                 forecast.postValue(ForecastUiState.error(message == null ? "" : message));
             }
         };
     }
 
-    private void track(@NonNull Cancellable c) {
+    private synchronized void track(@NonNull Cancellable c) {
         inFlight.add(c);
     }
 
-    private void cancelInFlight() {
+    private synchronized void cancelInFlight() {
         for (Cancellable c : inFlight) {
             c.cancel();
         }
