@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Night mode overrides. Brand gradient + on-brand text/icons stay the same;
+         only the card surface flips so cards don't look like a white slab on dark. -->
+
+    <color name="card_surface">#1E1E2E</color>
+    <color name="card_text_primary">#ECECEC</color>
+    <color name="card_text_secondary">#B0B0B0</color>
+</resources>

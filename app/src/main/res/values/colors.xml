@@ -1,5 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <!-- Semantic tokens. Override values for night mode in values-night/colors.xml. -->
+
+    <!-- App brand gradient (always dark sky — same in both modes, like iOS Weather). -->
+    <color name="gradient_start">#0F0C29</color>
+    <color name="gradient_center">#302B63</color>
+    <color name="gradient_end">#24243E</color>
+
+    <!-- Text and icons drawn directly on the brand gradient. -->
+    <color name="text_primary_on_brand">#FFFFFF</color>
+    <color name="text_secondary_on_brand">#E0E0E0</color>
+    <color name="icon_on_brand">#FFFFFF</color>
+
+    <!-- Search bar overlay drawn on the brand gradient. -->
+    <color name="search_overlay">#33FFFFFF</color>
+
+    <!-- Forecast item background drawn on the brand gradient. -->
+    <color name="forecast_item_overlay">#33FFFFFF</color>
+
+    <!-- Card surface and text inside cards (white card on the gradient in light mode). -->
+    <color name="card_surface">#FFFFFF</color>
+    <color name="card_text_primary">#212121</color>
+    <color name="card_text_secondary">#757575</color>
 </resources>

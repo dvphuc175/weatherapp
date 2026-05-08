@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bg_gradient_subtle"
@@ -17,7 +18,7 @@
             android:layout_width="match_parent"
             android:layout_height="50dp"
             android:layout_margin="20dp"
-            android:background="#33FFFFFF"
+            android:background="@color/search_overlay"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:padding="10dp">
@@ -27,20 +28,23 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:hint="Nhập tên thành phố (VD: Hanoi)..."
-                android:textColorHint="#E0E0E0"
-                android:textColor="#FFFFFF"
+                android:hint="@string/search_city_hint"
+                android:textColorHint="@color/text_secondary_on_brand"
+                android:textColor="@color/text_primary_on_brand"
                 android:background="@android:color/transparent"
                 android:textSize="16sp"
                 android:maxLines="1"
-                android:inputType="text" />
+                android:inputType="text"
+                android:imeOptions="actionSearch"
+                android:autofillHints="postalAddress" />
 
             <ImageView
                 android:id="@+id/ivSearch"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:src="@android:drawable/ic_menu_search"
-                app:tint="#FFFFFF" />
+                android:contentDescription="@string/search_action"
+                app:tint="@color/icon_on_brand" />
         </LinearLayout>
 
         <LinearLayout
@@ -68,10 +72,10 @@
                     android:id="@+id/tvLocation"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="#FFFFFF"
+                    android:textColor="@color/text_primary_on_brand"
                     android:textSize="28sp"
                     android:textStyle="bold"
-                    android:text="ĐANG TẢI..." />
+                    android:text="@string/loading_uppercase" />
             </LinearLayout>
 
             <com.airbnb.lottie.LottieAnimationView
@@ -86,8 +90,8 @@
                 android:id="@+id/tvTemperature"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="--°C"
-                android:textColor="#FFFFFF"
+                android:text="@string/placeholder_temperature"
+                android:textColor="@color/text_primary_on_brand"
                 android:textSize="60sp"
                 android:textStyle="bold" />
 
@@ -95,8 +99,8 @@
                 android:id="@+id/tvDescription"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Đang cập nhật..."
-                android:textColor="#E0E0E0"
+                android:text="@string/updating"
+                android:textColor="@color/text_secondary_on_brand"
                 android:textSize="18sp"
                 android:layout_marginTop="5dp" />
         </LinearLayout>
@@ -121,7 +125,7 @@
             android:layout_margin="20dp"
             app:cardCornerRadius="20dp"
             app:cardElevation="8dp"
-            app:cardBackgroundColor="#FFFFFF">
+            app:cardBackgroundColor="@color/card_surface">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -139,15 +143,15 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Độ ẩm"
-                        android:textColor="#757575"
+                        android:text="@string/humidity_label"
+                        android:textColor="@color/card_text_secondary"
                         android:textSize="14sp" />
                     <TextView
                         android:id="@+id/tvHumidity"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="--%"
-                        android:textColor="#212121"
+                        android:text="@string/placeholder_percent"
+                        android:textColor="@color/card_text_primary"
                         android:textSize="18sp"
                         android:textStyle="bold"
                         android:layout_marginTop="5dp"/>
@@ -162,15 +166,15 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Cảm giác như"
-                        android:textColor="#757575"
+                        android:text="@string/feels_like_label"
+                        android:textColor="@color/card_text_secondary"
                         android:textSize="14sp" />
                     <TextView
                         android:id="@+id/tvFeelsLike"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="--°C"
-                        android:textColor="#212121"
+                        android:text="@string/placeholder_temperature"
+                        android:textColor="@color/card_text_primary"
                         android:textSize="18sp"
                         android:textStyle="bold"
                         android:layout_marginTop="5dp"/>

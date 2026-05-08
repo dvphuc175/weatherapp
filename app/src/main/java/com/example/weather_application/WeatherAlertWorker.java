@@ -15,15 +15,11 @@ import com.example.weather_application.models.WeatherDescription;
 import com.example.weather_application.models.WeatherResponse;
 
 import java.util.List;
-import java.util.Locale;
 
 public class WeatherAlertWorker extends Worker {
 
     private static final String CHANNEL_ID = "weather_alert_channel";
-    private static final String CHANNEL_NAME = "Weather Alerts";
     private static final int NOTIFICATION_ID = 1;
-    private static final String UNITS = "metric";
-    private static final String LANG = "vi";
 
     // Hà Nội làm fallback nếu input không có toạ độ
     private static final double DEFAULT_LAT = 21.0285;
@@ -63,10 +59,10 @@ public class WeatherAlertWorker extends Worker {
             }
 
             if (mainWeather.equalsIgnoreCase("Rain") || mainWeather.equalsIgnoreCase("Thunderstorm")) {
-                String body = String.format(Locale.getDefault(),
-                        "Sắp tới có %s. Hãy chú ý an toàn!",
+                Context context = getApplicationContext();
+                String body = context.getString(R.string.notification_bad_weather_body,
                         description == null ? mainWeather : description);
-                sendNotification("Cảnh báo thời tiết xấu!", body);
+                sendNotification(context.getString(R.string.notification_bad_weather_title), body);
             }
             return Result.success();
         } catch (Exception e) {
@@ -83,7 +79,9 @@ public class WeatherAlertWorker extends Worker {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH);
+                    CHANNEL_ID,
+                    getApplicationContext().getString(R.string.notification_channel_name),
+                    NotificationManager.IMPORTANCE_HIGH);
             notificationManager.createNotificationChannel(channel);
         }
 
