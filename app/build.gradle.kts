@@ -62,18 +62,22 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
-    // 1. Retrofit & Gson: Dùng để gọi API thời tiết và dịch dữ liệu JSON
+    // Retrofit + OkHttp logging
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
-    // 2. Location: Dùng để lấy tọa độ hiện tại của máy ảo/điện thoại
+    // FusedLocation cho GPS
     implementation("com.google.android.gms:play-services-location:21.2.0")
 
-    // 3. Glide: Dùng để tải mượt mà các icon thời tiết (như mây, mưa, nắng) từ mạng
-    implementation("com.github.bumptech.glide:glide:4.16.0")
-
-    // 4. WorkManager: Cực kỳ quan trọng để làm tính năng chạy ngầm cảnh báo trước 15 phút
+    // WorkManager cho cảnh báo thời tiết chạy ngầm
     implementation("androidx.work:work-runtime:2.9.0")
+
+    // Lottie cho icon động + MPAndroidChart cho biểu đồ nhiệt độ
     implementation("com.airbnb.android:lottie:6.1.0")
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+
+    // ViewModel + LiveData cho MVVM
+    implementation("androidx.lifecycle:lifecycle-viewmodel:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-livedata:2.8.7")
 }
