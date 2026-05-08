@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?attr/colorControlNormal">
+    <!-- Monochrome white cloud + sun, dùng cho status bar notification (API 21+). -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M6.5,20A4.5,4.5 0 0,1 2,15.5A4.5,4.5 0 0,1 6.5,11C7.5,7.55 10.71,5 14.5,5C19.19,5 23,8.81 23,13.5C23,15.78 22.07,17.85 20.59,19.34L18.46,17.21A6,6 0 0,0 20,13.5A5.5,5.5 0 0,0 14.5,8C11.96,8 9.79,9.74 9.18,12.05L8.93,13L7.96,13.05L6.71,13C4.94,13.07 3.5,14.5 3.5,16.27A2.79,2.79 0 0,0 6.5,19H17.5L19.59,21.09C19.04,21.66 18.27,22 17.5,22H6.5A4.5,4.5 0 0,1 2,17.5C2,16.5 2.36,15.61 2.96,14.92L4.65,16.39C4.55,16.69 4.5,17.04 4.5,17.5C4.5,18.65 5.45,19.5 6.5,19.5"/>
+</vector>

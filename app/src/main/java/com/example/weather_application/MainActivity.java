@@ -1,4 +1,4 @@
-package com.example.weather_application; // Đảm bảo đúng tên package của bạn
+package com.example.weather_application;
 
 import android.Manifest;
 import android.content.Context;
@@ -16,13 +16,15 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.weather_application.models.ForecastResponse;
 import java.util.List;
+import java.util.Locale;
 import com.example.weather_application.models.ForecastItem;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
-import com.bumptech.glide.Glide;
+import com.example.weather_application.models.CurrentWeather;
+import com.example.weather_application.models.WeatherDescription;
 import com.example.weather_application.models.WeatherResponse;
 import com.example.weather_application.network.RetrofitClient;
 import com.example.weather_application.network.WeatherApiService;
@@ -50,10 +52,15 @@ public class MainActivity extends AppCompatActivity {
     private ForecastAdapter forecastAdapter;
 
     private FusedLocationProviderClient fusedLocationClient;
-    private static final int LOCATION_PERMISSION_REQUEST_CODE = 100;
 
-    // TODO: Dán API_KEY của bạn vào đây
-    private static final String API_KEY = "a3260fb92f43242142dd55e9dceaf3c6";
+    private static final int LOCATION_PERMISSION_REQUEST_CODE = 100;
+    private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 101;
+    private static final String UNITS = "metric";
+    private static final String LANG = "vi";
+    private static final long WORKER_INTERVAL_MINUTES = 15L;
+    private static final String WORKER_UNIQUE_NAME = "WeatherAlertWork";
+
+    private static final String API_KEY = BuildConfig.OPENWEATHER_API_KEY;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -79,7 +86,9 @@ public class MainActivity extends AppCompatActivity {
         // 2. Xin quyền Thông báo (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 101);
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                        NOTIFICATION_PERMISSION_REQUEST_CODE);
             }
         }
 
@@ -113,7 +122,10 @@ public class MainActivity extends AppCompatActivity {
                 ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
 
             ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                    new String[]{
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                    },
                     LOCATION_PERMISSION_REQUEST_CODE);
             return;
         }
@@ -134,13 +146,17 @@ public class MainActivity extends AppCompatActivity {
                                     .build();
 
                             androidx.work.PeriodicWorkRequest weatherWorkRequest =
-                                    new androidx.work.PeriodicWorkRequest.Builder(WeatherAlertWorker.class, 15, java.util.concurrent.TimeUnit.MINUTES)
+                                    new androidx.work.PeriodicWorkRequest.Builder(
+                                            WeatherAlertWorker.class,
+                                            WORKER_INTERVAL_MINUTES,
+                                            java.util.concurrent.TimeUnit.MINUTES)
                                             .setInputData(inputData)
                                             .build();
 
+                            // Dùng KEEP để không reset chu kỳ 15 phút mỗi lần mở app.
                             androidx.work.WorkManager.getInstance(MainActivity.this).enqueueUniquePeriodicWork(
-                                    "WeatherAlertWork",
-                                    androidx.work.ExistingPeriodicWorkPolicy.REPLACE,
+                                    WORKER_UNIQUE_NAME,
+                                    androidx.work.ExistingPeriodicWorkPolicy.KEEP,
                                     weatherWorkRequest);
 
                             // Lấy thời tiết theo tọa độ để hiển thị lên UI
@@ -156,7 +172,7 @@ public class MainActivity extends AppCompatActivity {
     // Hàm gọi API bằng Tọa độ (GPS)
     private void fetchWeatherData(double lat, double lon) {
         WeatherApiService apiService = RetrofitClient.getClient().create(WeatherApiService.class);
-        Call<WeatherResponse> call = apiService.getCurrentWeather(lat, lon, API_KEY, "metric", "vi");
+        Call<WeatherResponse> call = apiService.getCurrentWeather(lat, lon, API_KEY, UNITS, LANG);
 
         // Truyền true vì đây là vị trí GPS hiện tại
         call.enqueue(new WeatherCallback(true));
@@ -165,7 +181,7 @@ public class MainActivity extends AppCompatActivity {
     // Hàm gọi API bằng Tên thành phố (Ô tìm kiếm)
     private void fetchWeatherByCity(String cityName) {
         WeatherApiService apiService = RetrofitClient.getClient().create(WeatherApiService.class);
-        Call<WeatherResponse> call = apiService.getWeatherByCity(cityName, API_KEY, "metric", "vi");
+        Call<WeatherResponse> call = apiService.getWeatherByCity(cityName, API_KEY, UNITS, LANG);
 
         // Truyền false vì đây là kết quả tìm kiếm
         call.enqueue(new WeatherCallback(false));
@@ -182,40 +198,36 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onResponse(Call<WeatherResponse> call, Response<WeatherResponse> response) {
-            if (response.isSuccessful() && response.body() != null) {
-                WeatherResponse weatherData = response.body();
-
-                // Lấy tên địa phương thực tế từ API và in hoa
-                String actualLocationName = weatherData.getName().toUpperCase();
-
-                // Chỉ in tên thành phố, KHÔNG có emoji nữa
-                tvLocation.setText(actualLocationName);
-
-                // Cập nhật Lottie Icon dựa vào cờ isCurrentLocation
-                if (isCurrentLocation) {
-                    // Thay "anim_location" bằng tên file json vị trí của bạn
-                    lavLocationIcon.setAnimation(R.raw.anim_location);
-                } else {
-                    // Thay "anim_search" bằng tên file json tìm kiếm của bạn
-                    lavLocationIcon.setAnimation(R.raw.anim_search);
-                }
-                lavLocationIcon.playAnimation();
-
-                tvTemperature.setText(Math.round(weatherData.getMain().getTemp()) + "°C");
-                tvHumidity.setText(weatherData.getMain().getHumidity() + "%");
-                tvFeelsLike.setText(Math.round(weatherData.getMain().getFeelsLike()) + "°C");
-
-                if (weatherData.getWeather() != null && !weatherData.getWeather().isEmpty()) {
-                    String description = weatherData.getWeather().get(0).getDescription();
-                    String iconCode = weatherData.getWeather().get(0).getIcon();
-
-                    tvDescription.setText(description.substring(0, 1).toUpperCase() + description.substring(1));
-                    int lottieRes = getLottieRawRes(iconCode);
-                    lavWeatherIcon.setAnimation(lottieRes);
-                    lavWeatherIcon.playAnimation();
-                }
-            } else {
+            if (!response.isSuccessful() || response.body() == null) {
                 Toast.makeText(MainActivity.this, "Không tìm thấy thành phố này!", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            WeatherResponse weatherData = response.body();
+
+            String name = weatherData.getName();
+            tvLocation.setText(name == null ? "" : name.toUpperCase(Locale.ROOT));
+
+            if (isCurrentLocation) {
+                lavLocationIcon.setAnimation(R.raw.anim_location);
+            } else {
+                lavLocationIcon.setAnimation(R.raw.anim_search);
+            }
+            lavLocationIcon.playAnimation();
+
+            CurrentWeather main = weatherData.getMain();
+            if (main != null) {
+                tvTemperature.setText(formatCelsius(main.getTemp()));
+                tvHumidity.setText(String.format(Locale.getDefault(), "%d%%", main.getHumidity()));
+                tvFeelsLike.setText(formatCelsius(main.getFeelsLike()));
+            }
+
+            List<WeatherDescription> descriptions = weatherData.getWeather();
+            if (descriptions != null && !descriptions.isEmpty()) {
+                WeatherDescription first = descriptions.get(0);
+                tvDescription.setText(capitalize(first.getDescription()));
+                lavWeatherIcon.setAnimation(getLottieRawRes(first.getIcon()));
+                lavWeatherIcon.playAnimation();
             }
         }
 
@@ -235,49 +247,56 @@ public class MainActivity extends AppCompatActivity {
             } else {
                 Toast.makeText(this, "Bạn cần cấp quyền vị trí để ứng dụng hoạt động", Toast.LENGTH_SHORT).show();
             }
+        } else if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.length == 0 || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this,
+                        "Không có quyền thông báo, sẽ không nhận được cảnh báo thời tiết",
+                        Toast.LENGTH_SHORT).show();
+            }
         }
     }
     private void fetchForecastData(double lat, double lon) {
         WeatherApiService apiService = RetrofitClient.getClient().create(WeatherApiService.class);
-        Call<ForecastResponse> call = apiService.getForecast(lat, lon, API_KEY, "metric", "vi");
-
-        call.enqueue(new Callback<ForecastResponse>() {
-            @Override
-            public void onResponse(Call<ForecastResponse> call, Response<ForecastResponse> response) {
-                if (response.isSuccessful() && response.body() != null) {
-                    List<ForecastItem> forecastList = response.body().getList();
-
-                    forecastAdapter = new ForecastAdapter(MainActivity.this, forecastList);
-                    rvForecast.setAdapter(forecastAdapter);
-                    drawTemperatureChart(forecastList);
-                }
-            }
-
-            @Override
-            public void onFailure(Call<ForecastResponse> call, Throwable t) {
-                Toast.makeText(MainActivity.this, "Lỗi tải dự báo", Toast.LENGTH_SHORT).show();
-            }
-        });
+        Call<ForecastResponse> call = apiService.getForecast(lat, lon, API_KEY, UNITS, LANG);
+        call.enqueue(new ForecastCallback());
     }
+
     private void fetchForecastByCity(String cityName) {
         WeatherApiService apiService = RetrofitClient.getClient().create(WeatherApiService.class);
-        Call<ForecastResponse> call = apiService.getForecastByCity(cityName, API_KEY, "metric", "vi");
+        Call<ForecastResponse> call = apiService.getForecastByCity(cityName, API_KEY, UNITS, LANG);
+        call.enqueue(new ForecastCallback());
+    }
 
-        call.enqueue(new Callback<ForecastResponse>() {
-            @Override
-            public void onResponse(Call<ForecastResponse> call, Response<ForecastResponse> response) {
-                if (response.isSuccessful() && response.body() != null) {
-                    List<ForecastItem> forecastList = response.body().getList();
-                    forecastAdapter = new ForecastAdapter(MainActivity.this, forecastList);
-                    rvForecast.setAdapter(forecastAdapter);
-                    drawTemperatureChart(forecastList);
-                }
+    private class ForecastCallback implements Callback<ForecastResponse> {
+        @Override
+        public void onResponse(Call<ForecastResponse> call, Response<ForecastResponse> response) {
+            if (!response.isSuccessful() || response.body() == null) {
+                return;
             }
-            @Override
-            public void onFailure(Call<ForecastResponse> call, Throwable t) {
+            List<ForecastItem> forecastList = response.body().getList();
+            if (forecastList == null) {
+                return;
+            }
+            forecastAdapter = new ForecastAdapter(MainActivity.this, forecastList);
+            rvForecast.setAdapter(forecastAdapter);
+            drawTemperatureChart(forecastList);
+        }
 
-            }
-        });
+        @Override
+        public void onFailure(Call<ForecastResponse> call, Throwable t) {
+            Toast.makeText(MainActivity.this, "Lỗi tải dự báo", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private static String formatCelsius(double temp) {
+        return String.format(Locale.getDefault(), "%d°C", Math.round(temp));
+    }
+
+    private static String capitalize(String text) {
+        if (text == null || text.isEmpty()) {
+            return "";
+        }
+        return text.substring(0, 1).toUpperCase(Locale.ROOT) + text.substring(1);
     }
     private int getLottieRawRes(String iconCode) {
         switch (iconCode) {
