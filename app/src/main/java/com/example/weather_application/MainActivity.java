@@ -8,18 +8,26 @@ import android.os.Bundle;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import androidx.work.Data;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.PeriodicWorkRequest;
@@ -28,8 +36,10 @@ import androidx.work.WorkManager;
 import com.airbnb.lottie.LottieAnimationView;
 import com.example.weather_application.models.CurrentWeather;
 import com.example.weather_application.models.ForecastItem;
+import com.example.weather_application.models.Sys;
 import com.example.weather_application.models.WeatherDescription;
 import com.example.weather_application.models.WeatherResponse;
+import com.example.weather_application.models.Wind;
 import com.example.weather_application.ui.ForecastUiState;
 import com.example.weather_application.ui.MainViewModel;
 import com.example.weather_application.ui.WeatherUiState;
@@ -39,14 +49,19 @@ import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
+import com.github.mikephil.charting.formatter.ValueFormatter;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.Priority;
 import com.google.android.gms.tasks.CancellationTokenSource;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity {
@@ -56,12 +71,23 @@ public class MainActivity extends AppCompatActivity {
     private static final long WORKER_INTERVAL_MINUTES = 15L;
     private static final String WORKER_UNIQUE_NAME = "WeatherAlertWork";
     private static final int CHART_POINTS = 8;
+    /** OpenWeatherMap visibility caps at 10000 m even on perfectly clear days. */
+    private static final int MAX_VISIBILITY_METERS = 10_000;
 
     private TextView tvLocation, tvTemperature, tvDescription, tvHumidity, tvFeelsLike;
+    private TextView tvSunrise, tvSunset;
+    private TextView tvWind, tvPressure, tvVisibility;
+    private LinearLayout layoutSunCycle;
     private LottieAnimationView lavWeatherIcon;
     private LottieAnimationView lavLocationIcon;
     private ImageView ivSearch;
     private EditText etSearchCity;
+
+    private SwipeRefreshLayout swipeRefresh;
+    private FrameLayout layoutLoading;
+    private LinearLayout layoutError, layoutContent;
+    private TextView tvErrorMessage;
+    private Button btnRetry;
 
     private RecyclerView rvForecast;
     private LineChart lineChartTemp;
@@ -69,17 +95,27 @@ public class MainActivity extends AppCompatActivity {
 
     private FusedLocationProviderClient fusedLocationClient;
     private MainViewModel viewModel;
+    /** Sticky timezone offset (seconds from UTC) of the city currently being shown. Used for chart x-axis. */
+    private int currentCityTimezoneOffsetSec;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Edge-to-edge: let the gradient run under the system bars. We push the search row
+        // down by the status-bar inset and the metrics card up by the navigation-bar inset.
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_main);
 
         bindViews();
+        applyEdgeToEdgeInsets();
         rvForecast.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
 
         viewModel = new ViewModelProvider(this).get(MainViewModel.class);
         observeViewModel();
+
+        swipeRefresh.setColorSchemeResources(R.color.gradient_start, R.color.gradient_end);
+        swipeRefresh.setOnRefreshListener(viewModel::refresh);
+        btnRetry.setOnClickListener(v -> viewModel.refresh());
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                 && ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -103,17 +139,50 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void bindViews() {
+        swipeRefresh = findViewById(R.id.swipeRefresh);
+        layoutLoading = findViewById(R.id.layoutLoading);
+        layoutError = findViewById(R.id.layoutError);
+        layoutContent = findViewById(R.id.layoutContent);
+        tvErrorMessage = findViewById(R.id.tvErrorMessage);
+        btnRetry = findViewById(R.id.btnRetry);
+
         tvLocation = findViewById(R.id.tvLocation);
         tvTemperature = findViewById(R.id.tvTemperature);
         tvDescription = findViewById(R.id.tvDescription);
         tvHumidity = findViewById(R.id.tvHumidity);
         tvFeelsLike = findViewById(R.id.tvFeelsLike);
+        tvSunrise = findViewById(R.id.tvSunrise);
+        tvSunset = findViewById(R.id.tvSunset);
+        tvWind = findViewById(R.id.tvWind);
+        tvPressure = findViewById(R.id.tvPressure);
+        tvVisibility = findViewById(R.id.tvVisibility);
+        layoutSunCycle = findViewById(R.id.layoutSunCycle);
+
         lavWeatherIcon = findViewById(R.id.lavWeatherIcon);
         lavLocationIcon = findViewById(R.id.lavLocationIcon);
         etSearchCity = findViewById(R.id.etSearchCity);
         ivSearch = findViewById(R.id.ivSearch);
         rvForecast = findViewById(R.id.rvForecast);
         lineChartTemp = findViewById(R.id.lineChartTemp);
+    }
+
+    private void applyEdgeToEdgeInsets() {
+        View searchRow = findViewById(R.id.layoutSearch);
+        View root = findViewById(R.id.layoutRoot);
+        ViewCompat.setOnApplyWindowInsetsListener(swipeRefresh, (v, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            // Search row sits at the top; pad with status bar height so it isn't clipped.
+            searchRow.setPadding(searchRow.getPaddingLeft(),
+                    bars.top + dp(10), searchRow.getPaddingRight(), searchRow.getPaddingBottom());
+            // Pad the bottom of the scrollable content so the last card isn't behind the nav bar.
+            root.setPadding(root.getPaddingLeft(), root.getPaddingTop(),
+                    root.getPaddingRight(), bars.bottom);
+            return insets;
+        });
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     private void observeViewModel() {
@@ -186,14 +255,29 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void renderWeather(WeatherUiState state) {
+        // Drive the inline state UI off the weather LiveData. Forecast errors only Toast — the
+        // primary screen ought to keep showing the current weather even if the forecast fails.
+        if (state.isLoading() && state.getData() == null) {
+            showLoadingState();
+            return;
+        }
+        if (state.isError() && layoutContent.getVisibility() != View.VISIBLE) {
+            // First load failed; inline retry view replaces the content.
+            showErrorState(state.getErrorMessage());
+            return;
+        }
         if (state.isError()) {
+            // Refresh after a successful load failed; keep showing the old data and Toast.
+            swipeRefresh.setRefreshing(false);
             Toast.makeText(this, R.string.toast_city_not_found, Toast.LENGTH_SHORT).show();
             return;
         }
+
         WeatherResponse data = state.getData();
         if (data == null) {
             return;
         }
+        showContentState();
 
         String name = data.getName();
         tvLocation.setText(name == null ? "" : name.toUpperCase(Locale.ROOT));
@@ -206,6 +290,7 @@ public class MainActivity extends AppCompatActivity {
             tvTemperature.setText(formatCelsius(main.getTemp()));
             tvHumidity.setText(String.format(Locale.getDefault(), "%d%%", main.getHumidity()));
             tvFeelsLike.setText(formatCelsius(main.getFeelsLike()));
+            tvPressure.setText(getString(R.string.pressure_value_format, main.getPressure()));
         }
 
         List<WeatherDescription> descriptions = data.getWeather();
@@ -215,11 +300,19 @@ public class MainActivity extends AppCompatActivity {
             lavWeatherIcon.setAnimation(WeatherIconMapper.rawForIconCode(first.getIcon()));
             lavWeatherIcon.playAnimation();
         }
+
+        currentCityTimezoneOffsetSec = data.getTimezone();
+        bindSunCycle(data.getSys(), data.getTimezone());
+        bindWind(data.getWind());
+        bindVisibility(data.getVisibility());
     }
 
     private void renderForecast(ForecastUiState state) {
         if (state.isError()) {
             Toast.makeText(this, R.string.toast_forecast_load_error, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (state.isLoading()) {
             return;
         }
         List<ForecastItem> items = state.getItems();
@@ -230,6 +323,82 @@ public class MainActivity extends AppCompatActivity {
             forecastAdapter.submitList(items);
         }
         drawTemperatureChart(items);
+    }
+
+    private void showLoadingState() {
+        // Initial load: hide content and show centered spinner. Pull-to-refresh has its own
+        // SwipeRefreshLayout spinner, so we do NOT also show the inline ProgressBar in that case.
+        if (layoutContent.getVisibility() == View.VISIBLE) {
+            return;
+        }
+        layoutLoading.setVisibility(View.VISIBLE);
+        layoutError.setVisibility(View.GONE);
+        layoutContent.setVisibility(View.GONE);
+    }
+
+    private void showErrorState(@androidx.annotation.Nullable String message) {
+        swipeRefresh.setRefreshing(false);
+        layoutLoading.setVisibility(View.GONE);
+        layoutContent.setVisibility(View.GONE);
+        layoutError.setVisibility(View.VISIBLE);
+        if (message == null || message.isEmpty()) {
+            tvErrorMessage.setText(R.string.error_default_message);
+        } else {
+            tvErrorMessage.setText(message);
+        }
+    }
+
+    private void showContentState() {
+        swipeRefresh.setRefreshing(false);
+        layoutLoading.setVisibility(View.GONE);
+        layoutError.setVisibility(View.GONE);
+        layoutContent.setVisibility(View.VISIBLE);
+    }
+
+    private void bindSunCycle(@androidx.annotation.Nullable Sys sys, int timezoneOffsetSec) {
+        if (sys == null || (sys.getSunrise() == 0L && sys.getSunset() == 0L)) {
+            layoutSunCycle.setVisibility(View.GONE);
+            return;
+        }
+        tvSunrise.setText(getString(R.string.sunrise_value_format,
+                formatCityLocalTime(sys.getSunrise(), timezoneOffsetSec)));
+        tvSunset.setText(getString(R.string.sunset_value_format,
+                formatCityLocalTime(sys.getSunset(), timezoneOffsetSec)));
+        layoutSunCycle.setVisibility(View.VISIBLE);
+    }
+
+    private void bindWind(@androidx.annotation.Nullable Wind wind) {
+        if (wind == null) {
+            tvWind.setText(R.string.placeholder_dash);
+            return;
+        }
+        tvWind.setText(getString(R.string.wind_value_format, wind.getSpeed()));
+    }
+
+    private void bindVisibility(int visibilityMeters) {
+        if (visibilityMeters <= 0) {
+            tvVisibility.setText(R.string.placeholder_dash);
+            return;
+        }
+        if (visibilityMeters >= MAX_VISIBILITY_METERS) {
+            tvVisibility.setText(getString(R.string.visibility_value_km_format,
+                    visibilityMeters / 1000));
+        } else {
+            tvVisibility.setText(getString(R.string.visibility_value_km_decimal_format,
+                    visibilityMeters / 1000d));
+        }
+    }
+
+    /**
+     * Render a Unix timestamp (seconds, UTC) into the hour:minute that the city itself is seeing.
+     * We don't use the device's TimeZone — sunrise should look right even when the user searches
+     * for another city.
+     */
+    private static String formatCityLocalTime(long unixSeconds, int timezoneOffsetSec) {
+        long localMillis = (unixSeconds + timezoneOffsetSec) * 1000L;
+        SimpleDateFormat fmt = new SimpleDateFormat("HH:mm", Locale.getDefault());
+        fmt.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return fmt.format(new Date(localMillis));
     }
 
     @Override
@@ -269,13 +438,21 @@ public class MainActivity extends AppCompatActivity {
         }
 
         List<Entry> entries = new ArrayList<>();
+        final List<String> hourLabels = new ArrayList<>();
         int count = Math.min(forecastList.size(), CHART_POINTS);
+        SimpleDateFormat apiFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
+        apiFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+        SimpleDateFormat hourFormat = new SimpleDateFormat("HH'h'", Locale.getDefault());
+        hourFormat.setTimeZone(cityTimeZoneOrDefault());
+
         for (int i = 0; i < count; i++) {
-            CurrentWeather m = forecastList.get(i).getMain();
+            ForecastItem item = forecastList.get(i);
+            CurrentWeather m = item.getMain();
             if (m == null) {
                 continue;
             }
-            entries.add(new Entry(i, (float) m.getTemp()));
+            entries.add(new Entry(entries.size(), (float) m.getTemp()));
+            hourLabels.add(formatHourLabel(item.getDtTxt(), apiFormat, hourFormat));
         }
 
         LineDataSet dataSet = new LineDataSet(entries, getString(R.string.chart_temp_trend_label));
@@ -295,11 +472,48 @@ public class MainActivity extends AppCompatActivity {
         lineChartTemp.getAxisLeft().setEnabled(false);
         lineChartTemp.getAxisLeft().setSpaceTop(20f);
         lineChartTemp.getAxisLeft().setSpaceBottom(20f);
-        lineChartTemp.getXAxis().setSpaceMin(0.3f);
-        lineChartTemp.getXAxis().setSpaceMax(0.3f);
-        lineChartTemp.getXAxis().setTextColor(android.graphics.Color.WHITE);
-        lineChartTemp.getXAxis().setPosition(XAxis.XAxisPosition.BOTTOM);
+
+        XAxis xAxis = lineChartTemp.getXAxis();
+        xAxis.setSpaceMin(0.3f);
+        xAxis.setSpaceMax(0.3f);
+        xAxis.setTextColor(android.graphics.Color.WHITE);
+        xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+        xAxis.setDrawGridLines(false);
+        xAxis.setGranularity(1f);
+        xAxis.setLabelCount(hourLabels.size(), false);
+        xAxis.setValueFormatter(new ValueFormatter() {
+            @Override
+            public String getAxisLabel(float value, com.github.mikephil.charting.components.AxisBase axis) {
+                int idx = Math.round(value);
+                if (idx < 0 || idx >= hourLabels.size()) return "";
+                return hourLabels.get(idx);
+            }
+        });
         lineChartTemp.getLegend().setTextColor(android.graphics.Color.WHITE);
         lineChartTemp.invalidate();
+    }
+
+    private TimeZone cityTimeZoneOrDefault() {
+        if (currentCityTimezoneOffsetSec == 0) {
+            return TimeZone.getDefault();
+        }
+        // GMT[+/-]hh:mm; SimpleDateFormat respects this.
+        int totalMinutes = currentCityTimezoneOffsetSec / 60;
+        int hours = Math.abs(totalMinutes) / 60;
+        int minutes = Math.abs(totalMinutes) % 60;
+        String sign = currentCityTimezoneOffsetSec >= 0 ? "+" : "-";
+        return TimeZone.getTimeZone(String.format(Locale.US, "GMT%s%02d:%02d", sign, hours, minutes));
+    }
+
+    private static String formatHourLabel(@androidx.annotation.Nullable String dtTxt,
+                                          SimpleDateFormat apiFormat,
+                                          SimpleDateFormat hourFormat) {
+        if (dtTxt == null || dtTxt.isEmpty()) return "";
+        try {
+            Date parsed = apiFormat.parse(dtTxt);
+            return parsed == null ? "" : hourFormat.format(parsed);
+        } catch (ParseException e) {
+            return "";
+        }
     }
 }

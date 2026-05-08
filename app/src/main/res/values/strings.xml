@@ -14,6 +14,27 @@
     <!-- Card labels -->
     <string name="humidity_label">Humidity</string>
     <string name="feels_like_label">Feels like</string>
+    <string name="wind_label">Wind</string>
+    <string name="pressure_label">Pressure</string>
+    <string name="visibility_label">Visibility</string>
+    <string name="placeholder_dash">—</string>
+
+    <!-- Sunrise / sunset -->
+    <string name="sunrise_placeholder">🌅 --:--</string>
+    <string name="sunset_placeholder">🌇 --:--</string>
+    <string name="sunrise_value_format">🌅 %1$s</string>
+    <string name="sunset_value_format">🌇 %1$s</string>
+
+    <!-- Metric value formats -->
+    <string name="wind_value_format">%1$.1f m/s</string>
+    <string name="pressure_value_format">%1$d hPa</string>
+    <string name="visibility_value_km_format">%1$d km</string>
+    <string name="visibility_value_km_decimal_format">%1$.1f km</string>
+    <string name="pop_value_format">💧 %1$d%%</string>
+
+    <!-- Loading / error states -->
+    <string name="error_default_message">Could not load weather. Please try again.</string>
+    <string name="retry_button">Retry</string>
 
     <!-- Chart -->
     <string name="chart_temp_trend_label">24h temperature trend</string>

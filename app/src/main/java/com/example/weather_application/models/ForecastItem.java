@@ -13,7 +13,12 @@ public class ForecastItem {
     @SerializedName("weather")
     private List<WeatherDescription> weather; // Lấy lại class chứa icon
 
+    /** Probability of precipitation, 0.0–1.0. May be missing on older API responses. */
+    @SerializedName("pop")
+    private Double pop;
+
     public String getDtTxt() { return dtTxt; }
     public CurrentWeather getMain() { return main; }
     public List<WeatherDescription> getWeather() { return weather; }
+    public Double getPop() { return pop; }
 }
