@@ -4,19 +4,18 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.os.Build;
+
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
+
+import com.example.weather_application.data.WeatherRepository;
 import com.example.weather_application.models.WeatherDescription;
 import com.example.weather_application.models.WeatherResponse;
-import com.example.weather_application.network.RetrofitClient;
-import com.example.weather_application.network.WeatherApiService;
 
 import java.util.List;
 import java.util.Locale;
-
-import retrofit2.Response;
 
 public class WeatherAlertWorker extends Worker {
 
@@ -40,21 +39,17 @@ public class WeatherAlertWorker extends Worker {
         double lat = getInputData().getDouble("lat", DEFAULT_LAT);
         double lon = getInputData().getDouble("lon", DEFAULT_LON);
 
-        if (BuildConfig.OPENWEATHER_API_KEY.isEmpty()) {
+        WeatherRepository repository = new WeatherRepository();
+        if (!repository.hasApiKey()) {
             return Result.failure();
         }
 
-        WeatherApiService apiService = RetrofitClient.getClient().create(WeatherApiService.class);
         try {
-            Response<WeatherResponse> response = apiService
-                    .getCurrentWeather(lat, lon, BuildConfig.OPENWEATHER_API_KEY, UNITS, LANG)
-                    .execute();
-
-            if (!response.isSuccessful() || response.body() == null) {
+            WeatherResponse weather = repository.executeCurrentWeatherByCoord(lat, lon);
+            if (weather == null) {
                 return Result.retry();
             }
 
-            WeatherResponse weather = response.body();
             List<WeatherDescription> descriptions = weather.getWeather();
             if (descriptions == null || descriptions.isEmpty()) {
                 return Result.success();
