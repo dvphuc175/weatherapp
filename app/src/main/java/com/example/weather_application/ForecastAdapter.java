@@ -15,18 +15,30 @@ import com.example.weather_application.models.ForecastItem;
 import com.example.weather_application.models.WeatherDescription;
 import com.example.weather_application.util.WeatherIconMapper;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.TimeZone;
 
 public class ForecastAdapter extends RecyclerView.Adapter<ForecastAdapter.ForecastViewHolder> {
 
     private final Context context;
     private final List<ForecastItem> forecastList;
+    private final SimpleDateFormat apiFormat;
+    private final SimpleDateFormat dateFormat;
+    private final SimpleDateFormat timeFormat;
 
     public ForecastAdapter(@NonNull Context context, @NonNull List<ForecastItem> forecastList) {
         this.context = context;
         this.forecastList = new ArrayList<>(forecastList);
+        // OWM trả dt_txt theo UTC ("yyyy-MM-dd HH:mm:ss"). Hiển thị theo giờ local.
+        this.apiFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
+        this.apiFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+        this.dateFormat = new SimpleDateFormat("dd/MM", Locale.getDefault());
+        this.timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
     }
 
     public void submitList(@NonNull List<ForecastItem> items) {
@@ -46,12 +58,10 @@ public class ForecastAdapter extends RecyclerView.Adapter<ForecastAdapter.Foreca
     public void onBindViewHolder(@NonNull ForecastViewHolder holder, int position) {
         ForecastItem item = forecastList.get(position);
 
-        String rawTime = item.getDtTxt();
-        if (rawTime != null && rawTime.length() >= 16) {
-            String month = rawTime.substring(5, 7);
-            String day = rawTime.substring(8, 10);
-            holder.tvDate.setText(day + "/" + month);
-            holder.tvTime.setText(rawTime.substring(11, 16));
+        Date parsed = parseApiTime(item.getDtTxt());
+        if (parsed != null) {
+            holder.tvDate.setText(dateFormat.format(parsed));
+            holder.tvTime.setText(timeFormat.format(parsed));
         } else {
             holder.tvDate.setText("");
             holder.tvTime.setText("");
@@ -76,6 +86,17 @@ public class ForecastAdapter extends RecyclerView.Adapter<ForecastAdapter.Foreca
     @Override
     public int getItemCount() {
         return forecastList.size();
+    }
+
+    private Date parseApiTime(@androidx.annotation.Nullable String dtTxt) {
+        if (dtTxt == null || dtTxt.isEmpty()) {
+            return null;
+        }
+        try {
+            return apiFormat.parse(dtTxt);
+        } catch (ParseException e) {
+            return null;
+        }
     }
 
     public static class ForecastViewHolder extends RecyclerView.ViewHolder {
