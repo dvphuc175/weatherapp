@@ -134,7 +134,7 @@ public class MainActivity extends AppCompatActivity {
     private void triggerCitySearch(View v) {
         String cityName = etSearchCity.getText().toString().trim();
         if (cityName.isEmpty()) {
-            Toast.makeText(this, "Vui lòng nhập tên thành phố!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.toast_enter_city, Toast.LENGTH_SHORT).show();
             return;
         }
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -161,7 +161,7 @@ public class MainActivity extends AppCompatActivity {
                 .addOnSuccessListener(this, location -> {
                     if (location == null) {
                         Toast.makeText(MainActivity.this,
-                                "Vui lòng set vị trí GPS trong máy ảo.",
+                                R.string.toast_gps_unavailable,
                                 Toast.LENGTH_SHORT).show();
                         return;
                     }
@@ -187,7 +187,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void renderWeather(WeatherUiState state) {
         if (state.isError()) {
-            Toast.makeText(this, "Không tìm thấy thành phố này!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.toast_city_not_found, Toast.LENGTH_SHORT).show();
             return;
         }
         WeatherResponse data = state.getData();
@@ -219,7 +219,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void renderForecast(ForecastUiState state) {
         if (state.isError()) {
-            Toast.makeText(this, "Lỗi tải dự báo", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.toast_forecast_load_error, Toast.LENGTH_SHORT).show();
             return;
         }
         List<ForecastItem> items = state.getItems();
@@ -239,12 +239,12 @@ public class MainActivity extends AppCompatActivity {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 getLastLocation();
             } else {
-                Toast.makeText(this, "Bạn cần cấp quyền vị trí để ứng dụng hoạt động", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, R.string.toast_location_permission_required, Toast.LENGTH_SHORT).show();
             }
         } else if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
             if (grantResults.length == 0 || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this,
-                        "Không có quyền thông báo, sẽ không nhận được cảnh báo thời tiết",
+                        R.string.toast_notification_permission_denied,
                         Toast.LENGTH_SHORT).show();
             }
         }
@@ -278,7 +278,7 @@ public class MainActivity extends AppCompatActivity {
             entries.add(new Entry(i, (float) m.getTemp()));
         }
 
-        LineDataSet dataSet = new LineDataSet(entries, "Xu hướng nhiệt độ 24h");
+        LineDataSet dataSet = new LineDataSet(entries, getString(R.string.chart_temp_trend_label));
         dataSet.setColor(android.graphics.Color.WHITE);
         dataSet.setValueTextColor(android.graphics.Color.WHITE);
         dataSet.setValueTextSize(12f);
