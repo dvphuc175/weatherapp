@@ -167,22 +167,16 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void applyEdgeToEdgeInsets() {
-        View searchRow = findViewById(R.id.layoutSearch);
         View root = findViewById(R.id.layoutRoot);
         ViewCompat.setOnApplyWindowInsetsListener(swipeRefresh, (v, insets) -> {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            // Search row sits at the top; pad with status bar height so it isn't clipped.
-            searchRow.setPadding(searchRow.getPaddingLeft(),
-                    bars.top + dp(10), searchRow.getPaddingRight(), searchRow.getPaddingBottom());
-            // Pad the bottom of the scrollable content so the last card isn't behind the nav bar.
-            root.setPadding(root.getPaddingLeft(), root.getPaddingTop(),
+            // Push the whole scroll content down so the search row clears the status bar without
+            // its own contents being compressed by the inset (the row has a fixed height).
+            // Also pad the bottom so the last card isn't hidden behind the navigation bar.
+            root.setPadding(root.getPaddingLeft(), bars.top,
                     root.getPaddingRight(), bars.bottom);
             return insets;
         });
-    }
-
-    private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     private void observeViewModel() {

@@ -1,54 +1,54 @@
 <resources>
-    <string name="app_name">Weather Application</string>
+    <string name="app_name">Ứng dụng Thời tiết</string>
 
-    <!-- Search bar -->
-    <string name="search_city_hint">Search city (e.g., Hanoi)…</string>
-    <string name="search_action">Search</string>
+    <!-- Thanh tìm kiếm -->
+    <string name="search_city_hint">Nhập tên thành phố (VD: Hanoi)…</string>
+    <string name="search_action">Tìm kiếm</string>
 
     <!-- Header / current weather -->
-    <string name="loading_uppercase">LOADING…</string>
-    <string name="updating">Updating…</string>
+    <string name="loading_uppercase">ĐANG TẢI…</string>
+    <string name="updating">Đang cập nhật…</string>
     <string name="placeholder_temperature">--°C</string>
     <string name="placeholder_percent">--%</string>
 
     <!-- Card labels -->
-    <string name="humidity_label">Humidity</string>
-    <string name="feels_like_label">Feels like</string>
-    <string name="wind_label">Wind</string>
-    <string name="pressure_label">Pressure</string>
-    <string name="visibility_label">Visibility</string>
+    <string name="humidity_label">Độ ẩm</string>
+    <string name="feels_like_label">Cảm giác như</string>
+    <string name="wind_label">Gió</string>
+    <string name="pressure_label">Áp suất</string>
+    <string name="visibility_label">Tầm nhìn</string>
     <string name="placeholder_dash">—</string>
 
-    <!-- Sunrise / sunset -->
+    <!-- Bình minh / Hoàng hôn -->
     <string name="sunrise_placeholder">🌅 --:--</string>
     <string name="sunset_placeholder">🌇 --:--</string>
     <string name="sunrise_value_format">🌅 %1$s</string>
     <string name="sunset_value_format">🌇 %1$s</string>
 
-    <!-- Metric value formats -->
+    <!-- Định dạng giá trị -->
     <string name="wind_value_format">%1$.1f m/s</string>
     <string name="pressure_value_format">%1$d hPa</string>
     <string name="visibility_value_km_format">%1$d km</string>
     <string name="visibility_value_km_decimal_format">%1$.1f km</string>
     <string name="pop_value_format">💧 %1$d%%</string>
 
-    <!-- Loading / error states -->
-    <string name="error_default_message">Could not load weather. Please try again.</string>
-    <string name="retry_button">Retry</string>
+    <!-- Trạng thái loading / lỗi -->
+    <string name="error_default_message">Không tải được thời tiết. Vui lòng thử lại.</string>
+    <string name="retry_button">Thử lại</string>
 
     <!-- Chart -->
-    <string name="chart_temp_trend_label">24h temperature trend</string>
+    <string name="chart_temp_trend_label">Xu hướng nhiệt độ 24h</string>
 
-    <!-- Toasts (errors / status) -->
-    <string name="toast_enter_city">Please enter a city name.</string>
-    <string name="toast_gps_unavailable">No GPS fix yet — please set a location in your emulator.</string>
-    <string name="toast_city_not_found">City not found.</string>
-    <string name="toast_forecast_load_error">Failed to load forecast.</string>
-    <string name="toast_location_permission_required">Location permission is required for the app to work.</string>
-    <string name="toast_notification_permission_denied">Notifications are disabled — you won\'t receive weather alerts.</string>
+    <!-- Toasts -->
+    <string name="toast_enter_city">Vui lòng nhập tên thành phố!</string>
+    <string name="toast_gps_unavailable">Vui lòng set vị trí GPS trong máy ảo.</string>
+    <string name="toast_city_not_found">Không tìm thấy thành phố này!</string>
+    <string name="toast_forecast_load_error">Lỗi tải dự báo</string>
+    <string name="toast_location_permission_required">Bạn cần cấp quyền vị trí để ứng dụng hoạt động</string>
+    <string name="toast_notification_permission_denied">Không có quyền thông báo, sẽ không nhận được cảnh báo thời tiết</string>
 
-    <!-- Weather alert notifications -->
-    <string name="notification_channel_name">Weather Alerts</string>
-    <string name="notification_bad_weather_title">Bad weather warning</string>
-    <string name="notification_bad_weather_body">Incoming %1$s. Stay safe!</string>
+    <!-- Cảnh báo thời tiết -->
+    <string name="notification_channel_name">Cảnh báo thời tiết</string>
+    <string name="notification_bad_weather_title">Cảnh báo thời tiết xấu!</string>
+    <string name="notification_bad_weather_body">Sắp tới có %1$s. Hãy chú ý an toàn!</string>
 </resources>

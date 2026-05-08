@@ -1,0 +1,54 @@
+<resources>
+    <string name="app_name">Weather Application</string>
+
+    <!-- Search bar -->
+    <string name="search_city_hint">Search city (e.g., Hanoi)…</string>
+    <string name="search_action">Search</string>
+
+    <!-- Header / current weather -->
+    <string name="loading_uppercase">LOADING…</string>
+    <string name="updating">Updating…</string>
+    <string name="placeholder_temperature">--°C</string>
+    <string name="placeholder_percent">--%</string>
+
+    <!-- Card labels -->
+    <string name="humidity_label">Humidity</string>
+    <string name="feels_like_label">Feels like</string>
+    <string name="wind_label">Wind</string>
+    <string name="pressure_label">Pressure</string>
+    <string name="visibility_label">Visibility</string>
+    <string name="placeholder_dash">—</string>
+
+    <!-- Sunrise / sunset -->
+    <string name="sunrise_placeholder">🌅 --:--</string>
+    <string name="sunset_placeholder">🌇 --:--</string>
+    <string name="sunrise_value_format">🌅 %1$s</string>
+    <string name="sunset_value_format">🌇 %1$s</string>
+
+    <!-- Metric value formats -->
+    <string name="wind_value_format">%1$.1f m/s</string>
+    <string name="pressure_value_format">%1$d hPa</string>
+    <string name="visibility_value_km_format">%1$d km</string>
+    <string name="visibility_value_km_decimal_format">%1$.1f km</string>
+    <string name="pop_value_format">💧 %1$d%%</string>
+
+    <!-- Loading / error states -->
+    <string name="error_default_message">Could not load weather. Please try again.</string>
+    <string name="retry_button">Retry</string>
+
+    <!-- Chart -->
+    <string name="chart_temp_trend_label">24h temperature trend</string>
+
+    <!-- Toasts (errors / status) -->
+    <string name="toast_enter_city">Please enter a city name.</string>
+    <string name="toast_gps_unavailable">No GPS fix yet — please set a location in your emulator.</string>
+    <string name="toast_city_not_found">City not found.</string>
+    <string name="toast_forecast_load_error">Failed to load forecast.</string>
+    <string name="toast_location_permission_required">Location permission is required for the app to work.</string>
+    <string name="toast_notification_permission_denied">Notifications are disabled — you won\'t receive weather alerts.</string>
+
+    <!-- Weather alert notifications -->
+    <string name="notification_channel_name">Weather Alerts</string>
+    <string name="notification_bad_weather_title">Bad weather warning</string>
+    <string name="notification_bad_weather_body">Incoming %1$s. Stay safe!</string>
+</resources>
