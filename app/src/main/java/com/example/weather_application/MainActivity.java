@@ -38,6 +38,7 @@ import androidx.work.WorkManager;
 
 import com.airbnb.lottie.LottieAnimationView;
 import com.example.weather_application.models.CurrentWeather;
+import com.example.weather_application.models.DailyForecast;
 import com.example.weather_application.models.ForecastItem;
 import com.example.weather_application.models.Sys;
 import com.example.weather_application.models.WeatherDescription;
@@ -46,8 +47,10 @@ import com.example.weather_application.models.Wind;
 import com.example.weather_application.ui.ForecastUiState;
 import com.example.weather_application.ui.MainViewModel;
 import com.example.weather_application.ui.WeatherUiState;
+import com.example.weather_application.util.DailyForecastAggregator;
 import com.example.weather_application.util.WeatherGradientMapper;
 import com.example.weather_application.util.WeatherIconMapper;
+import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.data.Entry;
@@ -97,8 +100,11 @@ public class MainActivity extends AppCompatActivity {
     private Button btnRetry;
 
     private RecyclerView rvForecast;
+    private RecyclerView rvDailyForecast;
+    private MaterialButtonToggleGroup toggleForecastMode;
     private LineChart lineChartTemp;
     private ForecastAdapter forecastAdapter;
+    private DailyForecastAdapter dailyForecastAdapter;
 
     private FusedLocationProviderClient fusedLocationClient;
     private MainViewModel viewModel;
@@ -107,6 +113,11 @@ public class MainActivity extends AppCompatActivity {
     /** Current background gradient (start/center/end ARGBs); null until the first weather render. */
     @androidx.annotation.Nullable
     private int[] currentGradientColors;
+    /** {@code true} = daily/aggregated mode; {@code false} = hourly. Persisted across rotation via
+     *  {@link #onSaveInstanceState}. */
+    private boolean dailyMode;
+    /** Saved-state key for {@link #dailyMode}. */
+    private static final String STATE_DAILY_MODE = "state_daily_mode";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -119,6 +130,13 @@ public class MainActivity extends AppCompatActivity {
         bindViews();
         applyEdgeToEdgeInsets();
         rvForecast.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
+        rvDailyForecast.setLayoutManager(new LinearLayoutManager(this));
+
+        if (savedInstanceState != null) {
+            dailyMode = savedInstanceState.getBoolean(STATE_DAILY_MODE, false);
+        }
+        wireForecastModeToggle();
+        applyForecastModeVisibility();
 
         viewModel = new ViewModelProvider(this).get(MainViewModel.class);
         observeViewModel();
@@ -173,7 +191,39 @@ public class MainActivity extends AppCompatActivity {
         etSearchCity = findViewById(R.id.etSearchCity);
         ivSearch = findViewById(R.id.ivSearch);
         rvForecast = findViewById(R.id.rvForecast);
+        rvDailyForecast = findViewById(R.id.rvDailyForecast);
+        toggleForecastMode = findViewById(R.id.toggleForecastMode);
         lineChartTemp = findViewById(R.id.lineChartTemp);
+    }
+
+    /** Pre-select the toggle button matching {@link #dailyMode} and listen for user changes. */
+    private void wireForecastModeToggle() {
+        toggleForecastMode.check(dailyMode ? R.id.btnForecastDaily : R.id.btnForecastHourly);
+        toggleForecastMode.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+            if (!isChecked) {
+                return;
+            }
+            boolean nextDaily = checkedId == R.id.btnForecastDaily;
+            if (nextDaily == dailyMode) {
+                return;
+            }
+            dailyMode = nextDaily;
+            applyForecastModeVisibility();
+        });
+    }
+
+    /** Show only the views that belong to the active forecast mode. The chart is hourly-specific
+     *  so it follows {@code rvForecast}. */
+    private void applyForecastModeVisibility() {
+        rvForecast.setVisibility(dailyMode ? View.GONE : View.VISIBLE);
+        lineChartTemp.setVisibility(dailyMode ? View.GONE : View.VISIBLE);
+        rvDailyForecast.setVisibility(dailyMode ? View.VISIBLE : View.GONE);
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putBoolean(STATE_DAILY_MODE, dailyMode);
     }
 
     private void applyEdgeToEdgeInsets() {
@@ -328,6 +378,17 @@ public class MainActivity extends AppCompatActivity {
             forecastAdapter.submitList(items);
         }
         drawTemperatureChart(items);
+
+        // Aggregate the same hourly items into per-day buckets and feed the daily adapter.
+        // The aggregator uses the city's UTC offset so day boundaries match the city, not the device.
+        List<DailyForecast> dailyItems = DailyForecastAggregator.aggregate(
+                items, currentCityTimezoneOffsetSec);
+        if (dailyForecastAdapter == null) {
+            dailyForecastAdapter = new DailyForecastAdapter(this, dailyItems);
+            rvDailyForecast.setAdapter(dailyForecastAdapter);
+        } else {
+            dailyForecastAdapter.submitList(dailyItems);
+        }
     }
 
     private void showLoadingState() {
