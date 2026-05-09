@@ -3,6 +3,9 @@ package com.example.weather_application;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.TransitionDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
@@ -43,6 +46,7 @@ import com.example.weather_application.models.Wind;
 import com.example.weather_application.ui.ForecastUiState;
 import com.example.weather_application.ui.MainViewModel;
 import com.example.weather_application.ui.WeatherUiState;
+import com.example.weather_application.util.WeatherGradientMapper;
 import com.example.weather_application.util.WeatherIconMapper;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.XAxis;
@@ -58,6 +62,7 @@ import com.google.android.gms.tasks.CancellationTokenSource;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -73,6 +78,8 @@ public class MainActivity extends AppCompatActivity {
     private static final int CHART_POINTS = 8;
     /** OpenWeatherMap visibility caps at 10000 m even on perfectly clear days. */
     private static final int MAX_VISIBILITY_METERS = 10_000;
+    /** Crossfade duration when swapping the background gradient between weather conditions. */
+    private static final int GRADIENT_FADE_DURATION_MS = 600;
 
     private TextView tvLocation, tvTemperature, tvDescription, tvHumidity, tvFeelsLike;
     private TextView tvSunrise, tvSunset;
@@ -97,6 +104,9 @@ public class MainActivity extends AppCompatActivity {
     private MainViewModel viewModel;
     /** Sticky timezone offset (seconds from UTC) of the city currently being shown. Used for chart x-axis. */
     private int currentCityTimezoneOffsetSec;
+    /** Current background gradient (start/center/end ARGBs); null until the first weather render. */
+    @androidx.annotation.Nullable
+    private int[] currentGradientColors;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -293,6 +303,7 @@ public class MainActivity extends AppCompatActivity {
             tvDescription.setText(capitalize(first.getDescription()));
             lavWeatherIcon.setAnimation(WeatherIconMapper.rawForIconCode(first.getIcon()));
             lavWeatherIcon.playAnimation();
+            applyDynamicGradient(first.getIcon());
         }
 
         currentCityTimezoneOffsetSec = data.getTimezone();
@@ -359,6 +370,33 @@ public class MainActivity extends AppCompatActivity {
         tvSunset.setText(getString(R.string.sunset_value_format,
                 formatCityLocalTime(sys.getSunset(), timezoneOffsetSec)));
         layoutSunCycle.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * Crossfade the screen background to a gradient that matches the OWM icon code. The first
+     * call snaps directly (no transition from the static XML background); subsequent calls fade
+     * over {@link #GRADIENT_FADE_DURATION_MS} ms.
+     */
+    private void applyDynamicGradient(@androidx.annotation.Nullable String iconCode) {
+        int[] next = WeatherGradientMapper.colorsForIconCode(iconCode);
+        if (currentGradientColors != null && Arrays.equals(currentGradientColors, next)) {
+            return;
+        }
+        GradientDrawable target = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM, next.clone());
+        if (currentGradientColors == null) {
+            // First render: snap. Animating from the static XML drawable produces an awkward
+            // fade since the orientation/stops don't match exactly.
+            swipeRefresh.setBackground(target);
+        } else {
+            GradientDrawable from = new GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM, currentGradientColors.clone());
+            TransitionDrawable transition = new TransitionDrawable(new Drawable[]{from, target});
+            transition.setCrossFadeEnabled(true);
+            swipeRefresh.setBackground(transition);
+            transition.startTransition(GRADIENT_FADE_DURATION_MS);
+        }
+        currentGradientColors = next;
     }
 
     private void bindWind(@androidx.annotation.Nullable Wind wind) {
