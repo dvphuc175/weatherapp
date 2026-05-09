@@ -39,6 +39,14 @@
     <!-- Chart -->
     <string name="chart_temp_trend_label">24h temperature trend</string>
 
+    <!-- Hourly / Daily toggle -->
+    <string name="forecast_mode_hourly">Hourly</string>
+    <string name="forecast_mode_daily">Daily</string>
+    <string name="today_label">Today</string>
+    <string name="tomorrow_label">Tomorrow</string>
+    <!-- Min / max temperature range format, e.g. "22° / 30°" -->
+    <string name="daily_temp_range_format">%1$d° / %2$d°</string>
+
     <!-- Toasts (errors / status) -->
     <string name="toast_enter_city">Please enter a city name.</string>
     <string name="toast_gps_unavailable">No GPS fix yet — please set a location in your emulator.</string>

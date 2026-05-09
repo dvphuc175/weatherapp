@@ -39,6 +39,14 @@
     <!-- Chart -->
     <string name="chart_temp_trend_label">Xu hướng nhiệt độ 24h</string>
 
+    <!-- Toggle Theo giờ / Theo ngày -->
+    <string name="forecast_mode_hourly">Theo giờ</string>
+    <string name="forecast_mode_daily">Theo ngày</string>
+    <string name="today_label">Hôm nay</string>
+    <string name="tomorrow_label">Ngày mai</string>
+    <!-- Định dạng nhiệt độ thấp/cao trong dự báo theo ngày, vd: "22° / 30°" -->
+    <string name="daily_temp_range_format">%1$d° / %2$d°</string>
+
     <!-- Toasts -->
     <string name="toast_enter_city">Vui lòng nhập tên thành phố!</string>
     <string name="toast_gps_unavailable">Vui lòng set vị trí GPS trong máy ảo.</string>
