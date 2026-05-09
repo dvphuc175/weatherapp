@@ -98,6 +98,8 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout layoutError, layoutContent;
     private TextView tvErrorMessage;
     private Button btnRetry;
+    /** Current-conditions cards. Hidden in daily mode where they make less sense. */
+    private View cardHumidityFeels, cardWindPressureVisibility;
 
     private RecyclerView rvForecast;
     private RecyclerView rvDailyForecast;
@@ -194,6 +196,8 @@ public class MainActivity extends AppCompatActivity {
         rvDailyForecast = findViewById(R.id.rvDailyForecast);
         toggleForecastMode = findViewById(R.id.toggleForecastMode);
         lineChartTemp = findViewById(R.id.lineChartTemp);
+        cardHumidityFeels = findViewById(R.id.cardHumidityFeels);
+        cardWindPressureVisibility = findViewById(R.id.cardWindPressureVisibility);
     }
 
     /** Pre-select the toggle button matching {@link #dailyMode} and listen for user changes. */
@@ -213,11 +217,16 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /** Show only the views that belong to the active forecast mode. The chart is hourly-specific
-     *  so it follows {@code rvForecast}. */
+     *  so it follows {@code rvForecast}. The humidity/feels-like and wind/pressure/visibility
+     *  cards represent <em>current</em> conditions, which feels out of place next to a 5-day
+     *  outlook, so we hide them in daily mode and let the daily list breathe. The sun pill
+     *  stays since sunrise/sunset is a useful anchor in either mode. */
     private void applyForecastModeVisibility() {
         rvForecast.setVisibility(dailyMode ? View.GONE : View.VISIBLE);
         lineChartTemp.setVisibility(dailyMode ? View.GONE : View.VISIBLE);
         rvDailyForecast.setVisibility(dailyMode ? View.VISIBLE : View.GONE);
+        cardHumidityFeels.setVisibility(dailyMode ? View.GONE : View.VISIBLE);
+        cardWindPressureVisibility.setVisibility(dailyMode ? View.GONE : View.VISIBLE);
     }
 
     @Override

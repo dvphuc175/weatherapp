@@ -251,6 +251,7 @@
                     tools:visibility="gone" />
 
                 <androidx.cardview.widget.CardView
+                    android:id="@+id/cardHumidityFeels"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="20dp"
@@ -315,6 +316,7 @@
 
                 <!-- Details card: wind / pressure / visibility. -->
                 <androidx.cardview.widget.CardView
+                    android:id="@+id/cardWindPressureVisibility"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="20dp"
