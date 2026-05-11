@@ -3,8 +3,6 @@ package com.example.weather_application;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.content.res.ColorStateList;
-import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.HapticFeedbackConstants;
@@ -20,7 +18,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -65,16 +62,12 @@ public class MainActivity extends AppCompatActivity {
     private static final long WORKER_INTERVAL_MINUTES = 15L;
     private static final String WORKER_UNIQUE_NAME = "WeatherAlertWork";
 
-    /** Translucent fill that matches the search field so chips don't pop. */
-    private static final int CHIP_BACKGROUND_ARGB = 0x1AFFFFFF;
-    /** Faint white stroke for chip outlines. */
-    private static final int CHIP_STROKE_ARGB = 0x55FFFFFF;
-
     private EditText etSearchCity;
     private ImageView ivSearch, ivSettings;
     private HorizontalScrollView scrollRecentSearches;
     private ChipGroup chipGroupRecent;
     private LinearLayout layoutEmpty;
+    private LinearLayout layoutTopBar;
     private ViewPager2 viewPagerCities;
     private com.google.android.material.tabs.TabLayout pagerDots;
 
@@ -139,16 +132,21 @@ public class MainActivity extends AppCompatActivity {
         scrollRecentSearches = findViewById(R.id.scrollRecentSearches);
         chipGroupRecent = findViewById(R.id.chipGroupRecent);
         layoutEmpty = findViewById(R.id.layoutEmpty);
+        layoutTopBar = findViewById(R.id.layoutTopBar);
         viewPagerCities = findViewById(R.id.viewPagerCities);
         pagerDots = findViewById(R.id.pagerDots);
     }
 
+    /**
+     * Apply the status-bar inset as top padding on the floating top bar only — the pager and
+     * its per-page gradient fill the entire window (including under the status bar) so there
+     * is no opaque panel above the search row.
+     */
     private void applyEdgeToEdgeInsets() {
-        View root = findViewById(R.id.layoutActivityRoot);
-        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+        ViewCompat.setOnApplyWindowInsetsListener(layoutTopBar, (v, insets) -> {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            root.setPadding(root.getPaddingLeft(), bars.top,
-                    root.getPaddingRight(), bars.bottom);
+            v.setPadding(v.getPaddingLeft(), bars.top,
+                    v.getPaddingRight(), v.getPaddingBottom());
             return insets;
         });
     }
@@ -218,22 +216,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Builds a translucent outlined chip styled for the dark page gradient. Material's default
-     * surface-tinted chip looks like a white sticker on the gradient; this variant matches the
-     * search field instead.
+     * Builds a chip with default Material styling (light surface + dark text). Keeps text
+     * readable on both light and dark page gradients without custom color overrides.
      */
     @NonNull
     private Chip buildRecentChip(@NonNull RecentSearch entry) {
         Chip chip = new Chip(this);
         chip.setText(entry.cityName);
-        chip.setChipBackgroundColor(ColorStateList.valueOf(CHIP_BACKGROUND_ARGB));
-        chip.setChipStrokeColor(ColorStateList.valueOf(CHIP_STROKE_ARGB));
-        chip.setChipStrokeWidth(1f);
-        int onBrand = ContextCompat.getColor(this, R.color.text_primary_on_brand);
-        chip.setTextColor(onBrand);
-        chip.setCloseIconTint(ColorStateList.valueOf(onBrand));
         chip.setCloseIconVisible(true);
-        chip.setRippleColor(ColorStateList.valueOf(Color.argb(0x33, 0xFF, 0xFF, 0xFF)));
         chip.setCloseIconContentDescription(getString(
                 R.string.recent_search_delete_content_description, entry.cityName));
         chip.setOnClickListener(v -> {
