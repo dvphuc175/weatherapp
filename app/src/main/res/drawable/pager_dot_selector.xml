@@ -7,14 +7,14 @@
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_selected="true">
         <shape android:shape="oval">
-            <size android:width="8dp" android:height="8dp" />
+            <size android:width="6dp" android:height="6dp" />
             <solid android:color="@color/text_primary_on_brand" />
         </shape>
     </item>
     <item>
         <shape android:shape="oval">
-            <size android:width="8dp" android:height="8dp" />
-            <solid android:color="@color/text_secondary_on_brand" />
+            <size android:width="6dp" android:height="6dp" />
+            <solid android:color="#66FFFFFF" />
         </shape>
     </item>
 </selector>
