@@ -12,9 +12,6 @@
     <color name="text_secondary_on_brand">#E0E0E0</color>
     <color name="icon_on_brand">#FFFFFF</color>
 
-    <!-- Search bar overlay drawn on the brand gradient. -->
-    <color name="search_overlay">#33FFFFFF</color>
-
     <!-- Forecast item background drawn on the brand gradient. -->
     <color name="forecast_item_overlay">#33FFFFFF</color>
 

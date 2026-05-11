@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Activity shell for the multi-city pager. Owns the top bar (search + add city + settings),
-  the recent-searches chips, and a {@code ViewPager2}. Each page is a {@code CityWeatherFragment}
-  which handles its own gradient / loading-error-content states / offline banner.
+  Activity shell for the multi-city pager. Owns the top bar (search + settings), the
+  recent-searches chips (revealed on search focus only), and a {@code ViewPager2}. Each page is
+  a {@code CityWeatherFragment} that handles its own gradient / loading-error-content states /
+  offline banner.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -16,23 +17,25 @@
     <LinearLayout
         android:id="@+id/layoutSearch"
         android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:layout_margin="20dp"
-        android:background="@color/search_overlay"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="4dp"
+        android:background="@android:color/transparent"
         android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:padding="10dp">
+        android:gravity="center_vertical">
 
         <EditText
             android:id="@+id/etSearchCity"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="44dp"
             android:layout_weight="1"
             android:hint="@string/search_city_hint"
             android:textColorHint="@color/text_secondary_on_brand"
             android:textColor="@color/text_primary_on_brand"
-            android:background="@android:color/transparent"
-            android:textSize="16sp"
+            android:background="@drawable/bg_search_field"
+            android:paddingHorizontal="16dp"
+            android:textSize="15sp"
             android:maxLines="1"
             android:inputType="text"
             android:imeOptions="actionSearch"
@@ -42,19 +45,9 @@
             android:id="@+id/ivSearch"
             android:layout_width="24dp"
             android:layout_height="24dp"
+            android:layout_marginStart="12dp"
             android:src="@android:drawable/ic_menu_search"
             android:contentDescription="@string/search_action"
-            android:clickable="true"
-            android:focusable="true"
-            app:tint="@color/icon_on_brand" />
-
-        <ImageView
-            android:id="@+id/ivAddCity"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:layout_marginStart="12dp"
-            android:src="@android:drawable/ic_menu_add"
-            android:contentDescription="@string/add_city_action"
             android:clickable="true"
             android:focusable="true"
             app:tint="@color/icon_on_brand" />
@@ -72,12 +65,18 @@
             app:tint="@color/icon_on_brand" />
     </LinearLayout>
 
+    <!--
+      Recent-search chips. Hidden by default; shown only while the search EditText has focus
+      AND there is at least one recent entry. Background transparent so the underlying page
+      gradient bleeds through.
+    -->
     <HorizontalScrollView
         android:id="@+id/scrollRecentSearches"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="20dp"
         android:layout_marginBottom="8dp"
+        android:background="@android:color/transparent"
         android:scrollbars="none"
         android:visibility="gone"
         tools:visibility="visible">
@@ -117,17 +116,16 @@
                 android:gravity="center"
                 android:text="@string/empty_pager_title"
                 android:textColor="@color/text_primary_on_brand"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                android:textSize="16sp" />
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="6dp"
                 android:gravity="center"
                 android:text="@string/empty_pager_subtitle"
                 android:textColor="@color/text_secondary_on_brand"
-                android:textSize="14sp" />
+                android:textSize="13sp" />
         </LinearLayout>
 
         <com.google.android.material.tabs.TabLayout
@@ -135,12 +133,13 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|center_horizontal"
-            android:layout_marginBottom="12dp"
+            android:layout_marginBottom="10dp"
             android:background="@android:color/transparent"
             app:tabBackground="@drawable/pager_dot_selector"
             app:tabGravity="center"
             app:tabIndicatorHeight="0dp"
-            app:tabPaddingStart="6dp"
-            app:tabPaddingEnd="6dp" />
+            app:tabMinWidth="0dp"
+            app:tabPaddingStart="3dp"
+            app:tabPaddingEnd="3dp" />
     </FrameLayout>
 </LinearLayout>

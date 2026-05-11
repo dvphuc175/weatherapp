@@ -3,6 +3,8 @@ package com.example.weather_application;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.HapticFeedbackConstants;
@@ -13,17 +15,16 @@ import android.widget.EditText;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
-import androidx.lifecycle.LiveData;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.viewpager2.widget.ViewPager2;
@@ -51,10 +52,10 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Activity shell for the multi-city pager. Hosts the top bar (search + add-city + settings),
- * the recent-searches chips, and a {@link ViewPager2} of {@link
- * com.example.weather_application.ui.CityWeatherFragment} pages. All per-city weather state
- * lives in the fragments; this activity only owns cross-page concerns (saved-city list,
+ * Activity shell for the multi-city pager. Hosts the top bar (search + settings), the
+ * recent-searches chips (revealed on search focus only), and a {@link ViewPager2} of
+ * {@link com.example.weather_application.ui.CityWeatherFragment} pages. All per-city weather
+ * state lives in the fragments; this activity only owns cross-page concerns (saved-city list,
  * temperature unit, GPS coord) via the shared {@link MainViewModel}.
  */
 public class MainActivity extends AppCompatActivity {
@@ -64,8 +65,13 @@ public class MainActivity extends AppCompatActivity {
     private static final long WORKER_INTERVAL_MINUTES = 15L;
     private static final String WORKER_UNIQUE_NAME = "WeatherAlertWork";
 
+    /** Translucent fill that matches the search field so chips don't pop. */
+    private static final int CHIP_BACKGROUND_ARGB = 0x1AFFFFFF;
+    /** Faint white stroke for chip outlines. */
+    private static final int CHIP_STROKE_ARGB = 0x55FFFFFF;
+
     private EditText etSearchCity;
-    private ImageView ivSearch, ivAddCity, ivSettings;
+    private ImageView ivSearch, ivSettings;
     private HorizontalScrollView scrollRecentSearches;
     private ChipGroup chipGroupRecent;
     private LinearLayout layoutEmpty;
@@ -84,6 +90,9 @@ public class MainActivity extends AppCompatActivity {
     /** Set after a search successfully resolves; consumed once to swipe + pin. */
     @androidx.annotation.Nullable
     private String pendingSwipeAfterAdd;
+    /** Latest snapshot of the recent-search list; consulted when the search field focuses. */
+    @androidx.annotation.Nullable
+    private List<RecentSearch> lastRecentSearches;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -105,16 +114,8 @@ public class MainActivity extends AppCompatActivity {
         dotsMediator.attach();
 
         observeViewModel();
+        wireSearchInteractions();
 
-        ivSearch.setOnClickListener(this::triggerCitySearch);
-        etSearchCity.setOnEditorActionListener((v, actionId, event) -> {
-            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-                triggerCitySearch(v);
-                return true;
-            }
-            return false;
-        });
-        ivAddCity.setOnClickListener(this::triggerAddCity);
         ivSettings.setOnClickListener(v -> {
             v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
             new SettingsBottomSheet().show(getSupportFragmentManager(), SettingsBottomSheet.TAG);
@@ -134,7 +135,6 @@ public class MainActivity extends AppCompatActivity {
     private void bindViews() {
         etSearchCity = findViewById(R.id.etSearchCity);
         ivSearch = findViewById(R.id.ivSearch);
-        ivAddCity = findViewById(R.id.ivAddCity);
         ivSettings = findViewById(R.id.ivSettings);
         scrollRecentSearches = findViewById(R.id.scrollRecentSearches);
         chipGroupRecent = findViewById(R.id.chipGroupRecent);
@@ -151,6 +151,21 @@ public class MainActivity extends AppCompatActivity {
                     root.getPaddingRight(), bars.bottom);
             return insets;
         });
+    }
+
+    private void wireSearchInteractions() {
+        ivSearch.setOnClickListener(this::triggerCitySearch);
+        etSearchCity.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                triggerCitySearch(v);
+                return true;
+            }
+            return false;
+        });
+        // Reveal the recent chips only while the user is interacting with the search field.
+        // Mirrors iOS Spotlight: tap the field → suggestions appear; leave → suggestions hide.
+        etSearchCity.setOnFocusChangeListener((v, hasFocus) ->
+                updateRecentChipsVisibility(hasFocus));
     }
 
     private void observeViewModel() {
@@ -189,29 +204,55 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void renderRecentSearches(@androidx.annotation.Nullable List<RecentSearch> items) {
+        lastRecentSearches = items;
         chipGroupRecent.removeAllViews();
         if (items == null || items.isEmpty()) {
             scrollRecentSearches.setVisibility(View.GONE);
             return;
         }
-        scrollRecentSearches.setVisibility(View.VISIBLE);
         for (final RecentSearch entry : items) {
-            Chip chip = new Chip(this);
-            chip.setText(entry.cityName);
-            chip.setCloseIconVisible(true);
-            chip.setCloseIconContentDescription(getString(
-                    R.string.recent_search_delete_content_description, entry.cityName));
-            chip.setOnClickListener(v -> {
-                etSearchCity.setText(entry.cityName);
-                jumpToOrPinCity(entry.cityName);
-                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                if (imm != null) {
-                    imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-                }
-            });
-            chip.setOnCloseIconClickListener(v -> viewModel.removeRecentSearch(entry.cityName));
+            Chip chip = buildRecentChip(entry);
             chipGroupRecent.addView(chip);
         }
+        updateRecentChipsVisibility(etSearchCity.isFocused());
+    }
+
+    /**
+     * Builds a translucent outlined chip styled for the dark page gradient. Material's default
+     * surface-tinted chip looks like a white sticker on the gradient; this variant matches the
+     * search field instead.
+     */
+    @NonNull
+    private Chip buildRecentChip(@NonNull RecentSearch entry) {
+        Chip chip = new Chip(this);
+        chip.setText(entry.cityName);
+        chip.setChipBackgroundColor(ColorStateList.valueOf(CHIP_BACKGROUND_ARGB));
+        chip.setChipStrokeColor(ColorStateList.valueOf(CHIP_STROKE_ARGB));
+        chip.setChipStrokeWidth(1f);
+        int onBrand = ContextCompat.getColor(this, R.color.text_primary_on_brand);
+        chip.setTextColor(onBrand);
+        chip.setCloseIconTint(ColorStateList.valueOf(onBrand));
+        chip.setCloseIconVisible(true);
+        chip.setRippleColor(ColorStateList.valueOf(Color.argb(0x33, 0xFF, 0xFF, 0xFF)));
+        chip.setCloseIconContentDescription(getString(
+                R.string.recent_search_delete_content_description, entry.cityName));
+        chip.setOnClickListener(v -> {
+            etSearchCity.setText(entry.cityName);
+            jumpToOrPinCity(entry.cityName);
+            hideKeyboard(v);
+        });
+        chip.setOnCloseIconClickListener(v -> viewModel.removeRecentSearch(entry.cityName));
+        return chip;
+    }
+
+    /**
+     * Recent chips are visible only while the search field has focus AND there is at least one
+     * entry. Other state transitions (typing, blur, submit) reuse this single decision point.
+     */
+    private void updateRecentChipsVisibility(boolean searchFocused) {
+        boolean hasRecents = lastRecentSearches != null && !lastRecentSearches.isEmpty();
+        scrollRecentSearches.setVisibility(
+                searchFocused && hasRecents ? View.VISIBLE : View.GONE);
     }
 
     private void triggerCitySearch(View v) {
@@ -221,20 +262,11 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         hideKeyboard(v);
+        // Drop focus so the chips collapse — the search has been issued, no need to keep them
+        // showing.
+        etSearchCity.clearFocus();
         viewModel.recordRecentSearch(cityName);
         jumpToOrPinCity(cityName);
-    }
-
-    /** "+" icon → same as search, but always pins even if just searched. */
-    private void triggerAddCity(View v) {
-        String cityName = etSearchCity.getText().toString().trim();
-        if (cityName.isEmpty()) {
-            Toast.makeText(this, R.string.toast_enter_city, Toast.LENGTH_SHORT).show();
-            return;
-        }
-        hideKeyboard(v);
-        viewModel.recordRecentSearch(cityName);
-        pinCity(cityName);
     }
 
     private void hideKeyboard(View v) {
@@ -246,7 +278,8 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * If the city is already pinned: just swipe to its page. Otherwise: pin it and the
-     * {@code savedCities} observer will rebuild the pager + swipe via {@link #pendingSwipeAfterAdd}.
+     * {@code savedCities} observer will rebuild the pager + swipe via
+     * {@link #pendingSwipeAfterAdd}.
      */
     private void jumpToOrPinCity(@NonNull String cityName) {
         int idx = pagerAdapter.indexOfCity(cityName);
@@ -254,20 +287,8 @@ public class MainActivity extends AppCompatActivity {
             viewPagerCities.setCurrentItem(idx, true);
             return;
         }
-        pinCity(cityName);
-    }
-
-    private void pinCity(@NonNull String cityName) {
         pendingSwipeAfterAdd = cityName;
         viewModel.addSavedCity(cityName);
-        // Cap-reached / already-pinned cases are handled inside the VM. If the city was already
-        // pinned, the observer won't fire (DB unchanged), so we proactively swipe here as a
-        // fallback in case `pendingSwipeAfterAdd` doesn't get consumed.
-        int existing = pagerAdapter.indexOfCity(cityName);
-        if (existing >= 0) {
-            viewPagerCities.setCurrentItem(existing, true);
-            pendingSwipeAfterAdd = null;
-        }
     }
 
     private void requestLocationIfNeeded() {

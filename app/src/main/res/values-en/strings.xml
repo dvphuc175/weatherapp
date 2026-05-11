@@ -81,9 +81,8 @@
     <string name="offline_banner_days">Offline · Updated %1$d days ago</string>
 
     <!-- Multi-city pager (G7) -->
-    <string name="add_city_action">Add city</string>
     <string name="empty_pager_title">No cities yet</string>
-    <string name="empty_pager_subtitle">Type a city above and tap + to start.</string>
+    <string name="empty_pager_subtitle">Type a city above and tap the search icon to add it.</string>
     <string name="settings_saved_cities_label">Saved cities</string>
     <string name="settings_saved_cities_empty">You haven\'t saved any cities yet.</string>
     <string name="settings_saved_city_remove_content_description">Remove %1$s from saved cities</string>
