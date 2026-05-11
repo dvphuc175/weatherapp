@@ -59,4 +59,24 @@
     <string name="notification_channel_name">Weather Alerts</string>
     <string name="notification_bad_weather_title">Bad weather warning</string>
     <string name="notification_bad_weather_body">Incoming %1$s. Stay safe!</string>
+
+    <!-- Recent searches -->
+    <string name="recent_searches_title">Recent</string>
+    <string name="recent_search_delete_content_description">Remove %1$s from recent searches</string>
+
+    <!-- Settings -->
+    <string name="settings_action">Settings</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_unit_label">Temperature unit</string>
+    <string name="settings_unit_celsius">°C</string>
+    <string name="settings_unit_fahrenheit">°F</string>
+    <string name="settings_clear_recent">Clear recent searches</string>
+    <string name="settings_recent_cleared">Recent searches cleared</string>
+    <string name="settings_language_hint">Language follows the system. Change it in device Settings → Language.</string>
+
+    <!-- Offline / cached banner -->
+    <string name="offline_banner_just_now">Offline · Just updated</string>
+    <string name="offline_banner_minutes">Offline · Updated %1$d min ago</string>
+    <string name="offline_banner_hours">Offline · Updated %1$d hr ago</string>
+    <string name="offline_banner_days">Offline · Updated %1$d days ago</string>
 </resources>

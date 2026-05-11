@@ -10,9 +10,11 @@ import androidx.core.app.NotificationCompat;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
+import com.example.weather_application.data.UserPreferences;
 import com.example.weather_application.data.WeatherRepository;
 import com.example.weather_application.models.WeatherDescription;
 import com.example.weather_application.models.WeatherResponse;
+import com.example.weather_application.util.TemperatureUnit;
 
 import java.util.List;
 
@@ -41,7 +43,10 @@ public class WeatherAlertWorker extends Worker {
         }
 
         try {
-            WeatherResponse weather = repository.executeCurrentWeatherByCoord(lat, lon);
+            // The worker only checks "is it raining" — the unit doesn't change the answer, but
+            // we still use the user's preference so the upstream HTTP cache (if any) stays warm.
+            TemperatureUnit unit = UserPreferences.get(getApplicationContext()).getTemperatureUnit();
+            WeatherResponse weather = repository.executeCurrentWeatherByCoord(lat, lon, unit);
             if (weather == null) {
                 return Result.retry();
             }

@@ -13,6 +13,8 @@ import com.airbnb.lottie.LottieAnimationView;
 import com.example.weather_application.models.CurrentWeather;
 import com.example.weather_application.models.ForecastItem;
 import com.example.weather_application.models.WeatherDescription;
+import com.example.weather_application.util.TemperatureUnit;
+import com.example.weather_application.util.UnitFormatter;
 import com.example.weather_application.util.WeatherIconMapper;
 
 import java.text.ParseException;
@@ -30,15 +32,26 @@ public class ForecastAdapter extends RecyclerView.Adapter<ForecastAdapter.Foreca
     private final SimpleDateFormat apiFormat;
     private final SimpleDateFormat dateFormat;
     private final SimpleDateFormat timeFormat;
+    @NonNull
+    private TemperatureUnit temperatureUnit;
 
-    public ForecastAdapter(@NonNull Context context, @NonNull List<ForecastItem> forecastList) {
+    public ForecastAdapter(@NonNull Context context, @NonNull List<ForecastItem> forecastList,
+                           @NonNull TemperatureUnit temperatureUnit) {
         this.context = context;
         this.forecastList = new ArrayList<>(forecastList);
+        this.temperatureUnit = temperatureUnit;
         // OWM trả dt_txt theo UTC ("yyyy-MM-dd HH:mm:ss"). Hiển thị theo giờ local.
         this.apiFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
         this.apiFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
         this.dateFormat = new SimpleDateFormat("dd/MM", Locale.getDefault());
         this.timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+    }
+
+    /** Re-render with a different temperature unit. Cheap — just rebinds the existing list. */
+    public void setTemperatureUnit(@NonNull TemperatureUnit unit) {
+        if (this.temperatureUnit == unit) return;
+        this.temperatureUnit = unit;
+        notifyDataSetChanged();
     }
 
     public void submitList(@NonNull List<ForecastItem> items) {
@@ -70,7 +83,7 @@ public class ForecastAdapter extends RecyclerView.Adapter<ForecastAdapter.Foreca
         CurrentWeather main = item.getMain();
         if (main != null) {
             holder.tvForecastTemp.setText(
-                    String.format(Locale.getDefault(), "%d°C", Math.round(main.getTemp())));
+                    UnitFormatter.formatTemperatureRounded(main.getTemp(), temperatureUnit));
         } else {
             holder.tvForecastTemp.setText("");
         }

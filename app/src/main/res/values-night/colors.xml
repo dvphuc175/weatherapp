@@ -6,4 +6,8 @@
     <color name="card_surface">#1E1E2E</color>
     <color name="card_text_primary">#ECECEC</color>
     <color name="card_text_secondary">#B0B0B0</color>
+
+    <!-- Offline banner (more saturated amber so it still pops on the night gradient). -->
+    <color name="offline_banner_background">#99B45309</color>
+    <color name="offline_banner_text">#FFE9C7</color>
 </resources>

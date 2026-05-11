@@ -6,14 +6,19 @@ import android.content.pm.PackageManager;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.TransitionDrawable;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkRequest;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -37,6 +42,7 @@ import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
 
 import com.airbnb.lottie.LottieAnimationView;
+import com.example.weather_application.data.local.RecentSearch;
 import com.example.weather_application.models.CurrentWeather;
 import com.example.weather_application.models.DailyForecast;
 import com.example.weather_application.models.ForecastItem;
@@ -46,11 +52,16 @@ import com.example.weather_application.models.WeatherResponse;
 import com.example.weather_application.models.Wind;
 import com.example.weather_application.ui.ForecastUiState;
 import com.example.weather_application.ui.MainViewModel;
+import com.example.weather_application.ui.SettingsBottomSheet;
 import com.example.weather_application.ui.WeatherUiState;
 import com.example.weather_application.util.DailyForecastAggregator;
+import com.example.weather_application.util.TemperatureUnit;
+import com.example.weather_application.util.UnitFormatter;
 import com.example.weather_application.util.WeatherGradientMapper;
 import com.example.weather_application.util.WeatherIconMapper;
 import com.google.android.material.button.MaterialButtonToggleGroup;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.data.Entry;
@@ -91,7 +102,11 @@ public class MainActivity extends AppCompatActivity {
     private LottieAnimationView lavWeatherIcon;
     private LottieAnimationView lavLocationIcon;
     private ImageView ivSearch;
+    private ImageView ivSettings;
     private EditText etSearchCity;
+    private HorizontalScrollView scrollRecentSearches;
+    private ChipGroup chipGroupRecent;
+    private TextView tvOfflineBanner;
 
     private SwipeRefreshLayout swipeRefresh;
     private FrameLayout layoutLoading;
@@ -121,6 +136,15 @@ public class MainActivity extends AppCompatActivity {
     /** Saved-state key for {@link #dailyMode}. */
     private static final String STATE_DAILY_MODE = "state_daily_mode";
 
+    /** Current temperature unit, kept in sync with {@code MainViewModel#getTemperatureUnit()}. */
+    @NonNull
+    private TemperatureUnit currentUnit = TemperatureUnit.CELSIUS;
+
+    @androidx.annotation.Nullable
+    private ConnectivityManager connectivityManager;
+    @androidx.annotation.Nullable
+    private ConnectivityManager.NetworkCallback networkCallback;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -131,6 +155,7 @@ public class MainActivity extends AppCompatActivity {
 
         bindViews();
         applyEdgeToEdgeInsets();
+        applyPlaceholderTemperatures(currentUnit);
         rvForecast.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
         rvDailyForecast.setLayoutManager(new LinearLayoutManager(this));
 
@@ -166,6 +191,10 @@ public class MainActivity extends AppCompatActivity {
             }
             return false;
         });
+        ivSettings.setOnClickListener(v -> {
+            v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+            new SettingsBottomSheet().show(getSupportFragmentManager(), SettingsBottomSheet.TAG);
+        });
     }
 
     private void bindViews() {
@@ -198,6 +227,11 @@ public class MainActivity extends AppCompatActivity {
         lineChartTemp = findViewById(R.id.lineChartTemp);
         cardHumidityFeels = findViewById(R.id.cardHumidityFeels);
         cardWindPressureVisibility = findViewById(R.id.cardWindPressureVisibility);
+
+        ivSettings = findViewById(R.id.ivSettings);
+        scrollRecentSearches = findViewById(R.id.scrollRecentSearches);
+        chipGroupRecent = findViewById(R.id.chipGroupRecent);
+        tvOfflineBanner = findViewById(R.id.tvOfflineBanner);
     }
 
     /** Pre-select the toggle button matching {@link #dailyMode} and listen for user changes. */
@@ -235,6 +269,57 @@ public class MainActivity extends AppCompatActivity {
         outState.putBoolean(STATE_DAILY_MODE, dailyMode);
     }
 
+    @Override
+    protected void onStart() {
+        super.onStart();
+        registerNetworkCallback();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        unregisterNetworkCallback();
+    }
+
+    /**
+     * Watch for the network coming back online while we're foregrounded. If we were serving
+     * cached data, fire a refresh so the user immediately sees live values — they don't have
+     * to pull-to-refresh manually.
+     */
+    private void registerNetworkCallback() {
+        if (networkCallback != null) return;
+        connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (connectivityManager == null) return;
+        networkCallback = new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onAvailable(@NonNull Network network) {
+                runOnUiThread(() -> {
+                    if (Boolean.TRUE.equals(viewModel.getServingFromCache().getValue())) {
+                        viewModel.refresh();
+                    }
+                });
+            }
+        };
+        try {
+            NetworkRequest request = new NetworkRequest.Builder().build();
+            connectivityManager.registerNetworkCallback(request, networkCallback);
+        } catch (SecurityException ignored) {
+            // ACCESS_NETWORK_STATE is declared in the manifest; this branch is defensive.
+            networkCallback = null;
+        }
+    }
+
+    private void unregisterNetworkCallback() {
+        if (connectivityManager != null && networkCallback != null) {
+            try {
+                connectivityManager.unregisterNetworkCallback(networkCallback);
+            } catch (IllegalArgumentException ignored) {
+                // Already unregistered — nothing to do.
+            }
+        }
+        networkCallback = null;
+    }
+
     private void applyEdgeToEdgeInsets() {
         View root = findViewById(R.id.layoutRoot);
         ViewCompat.setOnApplyWindowInsetsListener(swipeRefresh, (v, insets) -> {
@@ -261,6 +346,91 @@ public class MainActivity extends AppCompatActivity {
                 renderForecast(state);
             }
         });
+        viewModel.getRecentSearches().observe(this, this::renderRecentSearches);
+        viewModel.getTemperatureUnit().observe(this, unit -> {
+            if (unit == null || unit == currentUnit) return;
+            currentUnit = unit;
+            applyPlaceholderTemperatures(unit);
+            if (forecastAdapter != null) {
+                forecastAdapter.setTemperatureUnit(unit);
+            }
+        });
+        viewModel.getServingFromCache().observe(this, this::renderOfflineBanner);
+        viewModel.getCacheSavedAt().observe(this, savedAt -> {
+            // Re-render whenever the cache timestamp changes; the banner text depends on it.
+            renderOfflineBanner(viewModel.getServingFromCache().getValue());
+        });
+    }
+
+    private void renderRecentSearches(@androidx.annotation.Nullable List<RecentSearch> items) {
+        chipGroupRecent.removeAllViews();
+        if (items == null || items.isEmpty()) {
+            scrollRecentSearches.setVisibility(View.GONE);
+            return;
+        }
+        scrollRecentSearches.setVisibility(View.VISIBLE);
+        for (final RecentSearch entry : items) {
+            Chip chip = new Chip(this);
+            chip.setText(entry.cityName);
+            chip.setCloseIconVisible(true);
+            chip.setCloseIconContentDescription(getString(
+                    R.string.recent_search_delete_content_description, entry.cityName));
+            chip.setOnClickListener(v -> {
+                etSearchCity.setText(entry.cityName);
+                viewModel.loadRecent(entry.cityName);
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+                }
+            });
+            chip.setOnCloseIconClickListener(v -> viewModel.removeRecentSearch(entry.cityName));
+            chipGroupRecent.addView(chip);
+        }
+    }
+
+    private void renderOfflineBanner(@androidx.annotation.Nullable Boolean servingFromCache) {
+        boolean offline = Boolean.TRUE.equals(servingFromCache);
+        if (!offline) {
+            tvOfflineBanner.setVisibility(View.GONE);
+            return;
+        }
+        Long savedAt = viewModel.getCacheSavedAt().getValue();
+        tvOfflineBanner.setText(formatOfflineBanner(savedAt));
+        tvOfflineBanner.setVisibility(View.VISIBLE);
+    }
+
+    private String formatOfflineBanner(@androidx.annotation.Nullable Long savedAt) {
+        if (savedAt == null) {
+            return getString(R.string.offline_banner_just_now);
+        }
+        long ageMs = Math.max(0L, System.currentTimeMillis() - savedAt);
+        long minutes = ageMs / 60_000L;
+        if (minutes < 1L) {
+            return getString(R.string.offline_banner_just_now);
+        }
+        if (minutes < 60L) {
+            return getString(R.string.offline_banner_minutes, (int) minutes);
+        }
+        long hours = minutes / 60L;
+        if (hours < 24L) {
+            return getString(R.string.offline_banner_hours, (int) hours);
+        }
+        long days = hours / 24L;
+        return getString(R.string.offline_banner_days, (int) days);
+    }
+
+    private void applyPlaceholderTemperatures(@NonNull TemperatureUnit unit) {
+        // The XML uses hardcoded "--°C" placeholders; rewrite them so the unit is consistent
+        // before the first network response arrives.
+        String placeholder = UnitFormatter.temperaturePlaceholder(unit);
+        if (tvTemperature != null && (tvTemperature.getText() == null
+                || tvTemperature.getText().toString().startsWith("--"))) {
+            tvTemperature.setText(placeholder);
+        }
+        if (tvFeelsLike != null && (tvFeelsLike.getText() == null
+                || tvFeelsLike.getText().toString().startsWith("--"))) {
+            tvFeelsLike.setText(placeholder);
+        }
     }
 
     private void triggerCitySearch(View v) {
@@ -350,9 +520,9 @@ public class MainActivity extends AppCompatActivity {
 
         CurrentWeather main = data.getMain();
         if (main != null) {
-            tvTemperature.setText(formatCelsius(main.getTemp()));
+            tvTemperature.setText(UnitFormatter.formatTemperatureRounded(main.getTemp(), currentUnit));
             tvHumidity.setText(String.format(Locale.getDefault(), "%d%%", main.getHumidity()));
-            tvFeelsLike.setText(formatCelsius(main.getFeelsLike()));
+            tvFeelsLike.setText(UnitFormatter.formatTemperatureRounded(main.getFeelsLike(), currentUnit));
             tvPressure.setText(getString(R.string.pressure_value_format, main.getPressure()));
         }
 
@@ -381,9 +551,10 @@ public class MainActivity extends AppCompatActivity {
         }
         List<ForecastItem> items = state.getItems();
         if (forecastAdapter == null) {
-            forecastAdapter = new ForecastAdapter(this, items);
+            forecastAdapter = new ForecastAdapter(this, items, currentUnit);
             rvForecast.setAdapter(forecastAdapter);
         } else {
+            forecastAdapter.setTemperatureUnit(currentUnit);
             forecastAdapter.submitList(items);
         }
         drawTemperatureChart(items);
@@ -474,7 +645,9 @@ public class MainActivity extends AppCompatActivity {
             tvWind.setText(R.string.placeholder_dash);
             return;
         }
-        tvWind.setText(getString(R.string.wind_value_format, wind.getSpeed()));
+        // m/s when in metric units, mph when in imperial. OWM returns the speed in the unit it
+        // was asked for, so we just append the matching suffix instead of converting.
+        tvWind.setText(UnitFormatter.formatWind(wind.getSpeed(), currentUnit));
     }
 
     private void bindVisibility(int visibilityMeters) {
@@ -519,10 +692,6 @@ public class MainActivity extends AppCompatActivity {
                         Toast.LENGTH_SHORT).show();
             }
         }
-    }
-
-    private static String formatCelsius(double temp) {
-        return String.format(Locale.getDefault(), "%d°C", Math.round(temp));
     }
 
     private static String capitalize(String text) {

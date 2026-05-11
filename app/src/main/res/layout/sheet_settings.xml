@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="@color/card_surface">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_title"
+        android:textColor="@color/card_text_primary"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <!-- Unit toggle -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="@string/settings_unit_label"
+        android:textColor="@color/card_text_secondary"
+        android:textSize="14sp" />
+
+    <com.google.android.material.button.MaterialButtonToggleGroup
+        android:id="@+id/toggleUnit"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        app:singleSelection="true"
+        app:selectionRequired="true">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnUnitCelsius"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_unit_celsius" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnUnitFahrenheit"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_unit_fahrenheit" />
+    </com.google.android.material.button.MaterialButtonToggleGroup>
+
+    <!-- Clear recents -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnClearRecents"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="@string/settings_clear_recent"
+        app:icon="@android:drawable/ic_menu_close_clear_cancel"
+        app:iconTint="@color/card_text_primary"
+        android:textColor="@color/card_text_primary"
+        tools:ignore="ButtonStyle" />
+
+    <!-- Language hint -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="@string/settings_language_hint"
+        android:textColor="@color/card_text_secondary"
+        android:textSize="13sp" />
+</LinearLayout>

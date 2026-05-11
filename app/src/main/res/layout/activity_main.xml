@@ -52,7 +52,54 @@
                     android:src="@android:drawable/ic_menu_search"
                     android:contentDescription="@string/search_action"
                     app:tint="@color/icon_on_brand" />
+
+                <ImageView
+                    android:id="@+id/ivSettings"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginStart="12dp"
+                    android:src="@android:drawable/ic_menu_preferences"
+                    android:contentDescription="@string/settings_action"
+                    android:padding="0dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:tint="@color/icon_on_brand" />
             </LinearLayout>
+
+            <!-- Recent searches chips (visible only when DB has rows). -->
+            <HorizontalScrollView
+                android:id="@+id/scrollRecentSearches"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="20dp"
+                android:layout_marginBottom="8dp"
+                android:scrollbars="none"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/chipGroupRecent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:singleLine="true"
+                    app:chipSpacingHorizontal="8dp" />
+            </HorizontalScrollView>
+
+            <!-- Offline banner — shown when the current view is served from cache. -->
+            <TextView
+                android:id="@+id/tvOfflineBanner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="20dp"
+                android:layout_marginBottom="12dp"
+                android:padding="10dp"
+                android:gravity="center"
+                android:background="@color/offline_banner_background"
+                android:textColor="@color/offline_banner_text"
+                android:textSize="13sp"
+                android:visibility="gone"
+                tools:visibility="visible"
+                tools:text="Đang offline · Cập nhật 3 phút trước" />
 
             <!-- Loading state: shown only on first load (data null + isLoading). -->
             <FrameLayout
