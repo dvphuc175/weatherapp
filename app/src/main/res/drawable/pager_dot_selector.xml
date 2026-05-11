@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Drawable used as `app:tabBackground` for the multi-city pager's dot indicator. Each tab is
+  drawn as a circle whose color depends on whether that tab is selected. Selected = white;
+  unselected = white with 50% alpha.
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true">
+        <shape android:shape="oval">
+            <size android:width="8dp" android:height="8dp" />
+            <solid android:color="@color/text_primary_on_brand" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="oval">
+            <size android:width="8dp" android:height="8dp" />
+            <solid android:color="@color/text_secondary_on_brand" />
+        </shape>
+    </item>
+</selector>

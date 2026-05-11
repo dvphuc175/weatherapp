@@ -87,4 +87,8 @@ dependencies {
     // Room for recent searches + offline cache
     implementation("androidx.room:room-runtime:2.6.1")
     annotationProcessor("androidx.room:room-compiler:2.6.1")
+
+    // ViewPager2 for the multi-city pager
+    implementation("androidx.viewpager2:viewpager2:1.1.0")
+    implementation("androidx.fragment:fragment:1.8.5")
 }

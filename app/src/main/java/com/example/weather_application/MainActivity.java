@@ -3,21 +3,13 @@ package com.example.weather_application;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.graphics.drawable.Drawable;
-import android.graphics.drawable.GradientDrawable;
-import android.graphics.drawable.TransitionDrawable;
-import android.net.ConnectivityManager;
-import android.net.Network;
-import android.net.NetworkRequest;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.Button;
 import android.widget.EditText;
-import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -31,157 +23,88 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.lifecycle.LiveData;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+import androidx.viewpager2.widget.ViewPager2;
 import androidx.work.Data;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
 
-import com.airbnb.lottie.LottieAnimationView;
 import com.example.weather_application.data.local.RecentSearch;
-import com.example.weather_application.models.CurrentWeather;
-import com.example.weather_application.models.DailyForecast;
-import com.example.weather_application.models.ForecastItem;
-import com.example.weather_application.models.Sys;
-import com.example.weather_application.models.WeatherDescription;
-import com.example.weather_application.models.WeatherResponse;
-import com.example.weather_application.models.Wind;
-import com.example.weather_application.ui.ForecastUiState;
+import com.example.weather_application.data.local.SavedCity;
+import com.example.weather_application.ui.CityPagerAdapter;
+import com.example.weather_application.ui.CityPagerAdapter.PagerItem;
 import com.example.weather_application.ui.MainViewModel;
 import com.example.weather_application.ui.SettingsBottomSheet;
-import com.example.weather_application.ui.WeatherUiState;
-import com.example.weather_application.util.DailyForecastAggregator;
-import com.example.weather_application.util.TemperatureUnit;
-import com.example.weather_application.util.UnitFormatter;
-import com.example.weather_application.util.WeatherGradientMapper;
-import com.example.weather_application.util.WeatherIconMapper;
-import com.google.android.material.button.MaterialButtonToggleGroup;
-import com.google.android.material.chip.Chip;
-import com.google.android.material.chip.ChipGroup;
-import com.github.mikephil.charting.charts.LineChart;
-import com.github.mikephil.charting.components.XAxis;
-import com.github.mikephil.charting.data.Entry;
-import com.github.mikephil.charting.data.LineData;
-import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.formatter.ValueFormatter;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.Priority;
 import com.google.android.gms.tasks.CancellationTokenSource;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.tabs.TabLayoutMediator;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
-import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Activity shell for the multi-city pager. Hosts the top bar (search + add-city + settings),
+ * the recent-searches chips, and a {@link ViewPager2} of {@link
+ * com.example.weather_application.ui.CityWeatherFragment} pages. All per-city weather state
+ * lives in the fragments; this activity only owns cross-page concerns (saved-city list,
+ * temperature unit, GPS coord) via the shared {@link MainViewModel}.
+ */
 public class MainActivity extends AppCompatActivity {
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 100;
     private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 101;
     private static final long WORKER_INTERVAL_MINUTES = 15L;
     private static final String WORKER_UNIQUE_NAME = "WeatherAlertWork";
-    private static final int CHART_POINTS = 8;
-    /** OpenWeatherMap visibility caps at 10000 m even on perfectly clear days. */
-    private static final int MAX_VISIBILITY_METERS = 10_000;
-    /** Crossfade duration when swapping the background gradient between weather conditions. */
-    private static final int GRADIENT_FADE_DURATION_MS = 600;
 
-    private TextView tvLocation, tvTemperature, tvDescription, tvHumidity, tvFeelsLike;
-    private TextView tvSunrise, tvSunset;
-    private TextView tvWind, tvPressure, tvVisibility;
-    private LinearLayout layoutSunCycle;
-    private LottieAnimationView lavWeatherIcon;
-    private LottieAnimationView lavLocationIcon;
-    private ImageView ivSearch;
-    private ImageView ivSettings;
     private EditText etSearchCity;
+    private ImageView ivSearch, ivAddCity, ivSettings;
     private HorizontalScrollView scrollRecentSearches;
     private ChipGroup chipGroupRecent;
-    private TextView tvOfflineBanner;
+    private LinearLayout layoutEmpty;
+    private ViewPager2 viewPagerCities;
+    private com.google.android.material.tabs.TabLayout pagerDots;
 
-    private SwipeRefreshLayout swipeRefresh;
-    private FrameLayout layoutLoading;
-    private LinearLayout layoutError, layoutContent;
-    private TextView tvErrorMessage;
-    private Button btnRetry;
-    /** Current-conditions cards. Hidden in daily mode where they make less sense. */
-    private View cardHumidityFeels, cardWindPressureVisibility;
+    private CityPagerAdapter pagerAdapter;
+    private TabLayoutMediator dotsMediator;
 
-    private RecyclerView rvForecast;
-    private RecyclerView rvDailyForecast;
-    private MaterialButtonToggleGroup toggleForecastMode;
-    private LineChart lineChartTemp;
-    private ForecastAdapter forecastAdapter;
-    private DailyForecastAdapter dailyForecastAdapter;
-
-    private FusedLocationProviderClient fusedLocationClient;
     private MainViewModel viewModel;
-    /** Sticky timezone offset (seconds from UTC) of the city currently being shown. Used for chart x-axis. */
-    private int currentCityTimezoneOffsetSec;
-    /** Current background gradient (start/center/end ARGBs); null until the first weather render. */
-    @androidx.annotation.Nullable
-    private int[] currentGradientColors;
-    /** {@code true} = daily/aggregated mode; {@code false} = hourly. Persisted across rotation via
-     *  {@link #onSaveInstanceState}. */
-    private boolean dailyMode;
-    /** Saved-state key for {@link #dailyMode}. */
-    private static final String STATE_DAILY_MODE = "state_daily_mode";
+    private FusedLocationProviderClient fusedLocationClient;
 
-    /** Current temperature unit, kept in sync with {@code MainViewModel#getTemperatureUnit()}. */
-    @NonNull
-    private TemperatureUnit currentUnit = TemperatureUnit.CELSIUS;
-
+    /** {@code true} once we've granted GPS permission and asked for a fix; controls whether
+     *  the pager includes a current-location page slot. */
+    private boolean currentLocationEnabled;
+    /** Set after a search successfully resolves; consumed once to swipe + pin. */
     @androidx.annotation.Nullable
-    private ConnectivityManager connectivityManager;
-    @androidx.annotation.Nullable
-    private ConnectivityManager.NetworkCallback networkCallback;
+    private String pendingSwipeAfterAdd;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // Edge-to-edge: let the gradient run under the system bars. We push the search row
-        // down by the status-bar inset and the metrics card up by the navigation-bar inset.
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_main);
 
         bindViews();
         applyEdgeToEdgeInsets();
-        applyPlaceholderTemperatures(currentUnit);
-        rvForecast.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
-        rvDailyForecast.setLayoutManager(new LinearLayoutManager(this));
-
-        if (savedInstanceState != null) {
-            dailyMode = savedInstanceState.getBoolean(STATE_DAILY_MODE, false);
-        }
-        wireForecastModeToggle();
-        applyForecastModeVisibility();
 
         viewModel = new ViewModelProvider(this).get(MainViewModel.class);
-        observeViewModel();
-
-        swipeRefresh.setColorSchemeResources(R.color.gradient_start, R.color.gradient_end);
-        swipeRefresh.setOnRefreshListener(viewModel::refresh);
-        btnRetry.setOnClickListener(v -> viewModel.refresh());
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                && ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
-                    NOTIFICATION_PERMISSION_REQUEST_CODE);
-        }
-
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-        getLastLocation();
+
+        pagerAdapter = new CityPagerAdapter(this);
+        viewPagerCities.setAdapter(pagerAdapter);
+        // The dots indicator follows the pager 1:1; no labels.
+        dotsMediator = new TabLayoutMediator(pagerDots, viewPagerCities,
+                (tab, position) -> { /* dots only */ });
+        dotsMediator.attach();
+
+        observeViewModel();
 
         ivSearch.setOnClickListener(this::triggerCitySearch);
         etSearchCity.setOnEditorActionListener((v, actionId, event) -> {
@@ -191,142 +114,39 @@ public class MainActivity extends AppCompatActivity {
             }
             return false;
         });
+        ivAddCity.setOnClickListener(this::triggerAddCity);
         ivSettings.setOnClickListener(v -> {
             v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
             new SettingsBottomSheet().show(getSupportFragmentManager(), SettingsBottomSheet.TAG);
         });
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                    NOTIFICATION_PERMISSION_REQUEST_CODE);
+        }
+
+        requestLocationIfNeeded();
     }
 
     private void bindViews() {
-        swipeRefresh = findViewById(R.id.swipeRefresh);
-        layoutLoading = findViewById(R.id.layoutLoading);
-        layoutError = findViewById(R.id.layoutError);
-        layoutContent = findViewById(R.id.layoutContent);
-        tvErrorMessage = findViewById(R.id.tvErrorMessage);
-        btnRetry = findViewById(R.id.btnRetry);
-
-        tvLocation = findViewById(R.id.tvLocation);
-        tvTemperature = findViewById(R.id.tvTemperature);
-        tvDescription = findViewById(R.id.tvDescription);
-        tvHumidity = findViewById(R.id.tvHumidity);
-        tvFeelsLike = findViewById(R.id.tvFeelsLike);
-        tvSunrise = findViewById(R.id.tvSunrise);
-        tvSunset = findViewById(R.id.tvSunset);
-        tvWind = findViewById(R.id.tvWind);
-        tvPressure = findViewById(R.id.tvPressure);
-        tvVisibility = findViewById(R.id.tvVisibility);
-        layoutSunCycle = findViewById(R.id.layoutSunCycle);
-
-        lavWeatherIcon = findViewById(R.id.lavWeatherIcon);
-        lavLocationIcon = findViewById(R.id.lavLocationIcon);
         etSearchCity = findViewById(R.id.etSearchCity);
         ivSearch = findViewById(R.id.ivSearch);
-        rvForecast = findViewById(R.id.rvForecast);
-        rvDailyForecast = findViewById(R.id.rvDailyForecast);
-        toggleForecastMode = findViewById(R.id.toggleForecastMode);
-        lineChartTemp = findViewById(R.id.lineChartTemp);
-        cardHumidityFeels = findViewById(R.id.cardHumidityFeels);
-        cardWindPressureVisibility = findViewById(R.id.cardWindPressureVisibility);
-
+        ivAddCity = findViewById(R.id.ivAddCity);
         ivSettings = findViewById(R.id.ivSettings);
         scrollRecentSearches = findViewById(R.id.scrollRecentSearches);
         chipGroupRecent = findViewById(R.id.chipGroupRecent);
-        tvOfflineBanner = findViewById(R.id.tvOfflineBanner);
-    }
-
-    /** Pre-select the toggle button matching {@link #dailyMode} and listen for user changes. */
-    private void wireForecastModeToggle() {
-        toggleForecastMode.check(dailyMode ? R.id.btnForecastDaily : R.id.btnForecastHourly);
-        toggleForecastMode.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
-            if (!isChecked) {
-                return;
-            }
-            boolean nextDaily = checkedId == R.id.btnForecastDaily;
-            if (nextDaily == dailyMode) {
-                return;
-            }
-            dailyMode = nextDaily;
-            applyForecastModeVisibility();
-        });
-    }
-
-    /** Show only the views that belong to the active forecast mode. The chart is hourly-specific
-     *  so it follows {@code rvForecast}. The humidity/feels-like and wind/pressure/visibility
-     *  cards represent <em>current</em> conditions, which feels out of place next to a 5-day
-     *  outlook, so we hide them in daily mode and let the daily list breathe. The sun pill
-     *  stays since sunrise/sunset is a useful anchor in either mode. */
-    private void applyForecastModeVisibility() {
-        rvForecast.setVisibility(dailyMode ? View.GONE : View.VISIBLE);
-        lineChartTemp.setVisibility(dailyMode ? View.GONE : View.VISIBLE);
-        rvDailyForecast.setVisibility(dailyMode ? View.VISIBLE : View.GONE);
-        cardHumidityFeels.setVisibility(dailyMode ? View.GONE : View.VISIBLE);
-        cardWindPressureVisibility.setVisibility(dailyMode ? View.GONE : View.VISIBLE);
-    }
-
-    @Override
-    protected void onSaveInstanceState(@NonNull Bundle outState) {
-        super.onSaveInstanceState(outState);
-        outState.putBoolean(STATE_DAILY_MODE, dailyMode);
-    }
-
-    @Override
-    protected void onStart() {
-        super.onStart();
-        registerNetworkCallback();
-    }
-
-    @Override
-    protected void onStop() {
-        super.onStop();
-        unregisterNetworkCallback();
-    }
-
-    /**
-     * Watch for the network coming back online while we're foregrounded. If we were serving
-     * cached data, fire a refresh so the user immediately sees live values — they don't have
-     * to pull-to-refresh manually.
-     */
-    private void registerNetworkCallback() {
-        if (networkCallback != null) return;
-        connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        if (connectivityManager == null) return;
-        networkCallback = new ConnectivityManager.NetworkCallback() {
-            @Override
-            public void onAvailable(@NonNull Network network) {
-                runOnUiThread(() -> {
-                    if (Boolean.TRUE.equals(viewModel.getServingFromCache().getValue())) {
-                        viewModel.refresh();
-                    }
-                });
-            }
-        };
-        try {
-            NetworkRequest request = new NetworkRequest.Builder().build();
-            connectivityManager.registerNetworkCallback(request, networkCallback);
-        } catch (SecurityException ignored) {
-            // ACCESS_NETWORK_STATE is declared in the manifest; this branch is defensive.
-            networkCallback = null;
-        }
-    }
-
-    private void unregisterNetworkCallback() {
-        if (connectivityManager != null && networkCallback != null) {
-            try {
-                connectivityManager.unregisterNetworkCallback(networkCallback);
-            } catch (IllegalArgumentException ignored) {
-                // Already unregistered — nothing to do.
-            }
-        }
-        networkCallback = null;
+        layoutEmpty = findViewById(R.id.layoutEmpty);
+        viewPagerCities = findViewById(R.id.viewPagerCities);
+        pagerDots = findViewById(R.id.pagerDots);
     }
 
     private void applyEdgeToEdgeInsets() {
-        View root = findViewById(R.id.layoutRoot);
-        ViewCompat.setOnApplyWindowInsetsListener(swipeRefresh, (v, insets) -> {
+        View root = findViewById(R.id.layoutActivityRoot);
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            // Push the whole scroll content down so the search row clears the status bar without
-            // its own contents being compressed by the inset (the row has a fixed height).
-            // Also pad the bottom so the last card isn't hidden behind the navigation bar.
             root.setPadding(root.getPaddingLeft(), bars.top,
                     root.getPaddingRight(), bars.bottom);
             return insets;
@@ -334,32 +154,38 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void observeViewModel() {
-        viewModel.getWeather().observe(this, new Observer<WeatherUiState>() {
-            @Override
-            public void onChanged(WeatherUiState state) {
-                renderWeather(state);
-            }
-        });
-        viewModel.getForecast().observe(this, new Observer<ForecastUiState>() {
-            @Override
-            public void onChanged(ForecastUiState state) {
-                renderForecast(state);
-            }
-        });
         viewModel.getRecentSearches().observe(this, this::renderRecentSearches);
-        viewModel.getTemperatureUnit().observe(this, unit -> {
-            if (unit == null || unit == currentUnit) return;
-            currentUnit = unit;
-            applyPlaceholderTemperatures(unit);
-            if (forecastAdapter != null) {
-                forecastAdapter.setTemperatureUnit(unit);
+        viewModel.getSavedCities().observe(this, new Observer<List<SavedCity>>() {
+            @Override
+            public void onChanged(List<SavedCity> cities) {
+                rebuildPager(cities);
             }
         });
-        viewModel.getServingFromCache().observe(this, this::renderOfflineBanner);
-        viewModel.getCacheSavedAt().observe(this, savedAt -> {
-            // Re-render whenever the cache timestamp changes; the banner text depends on it.
-            renderOfflineBanner(viewModel.getServingFromCache().getValue());
-        });
+    }
+
+    private void rebuildPager(@androidx.annotation.Nullable List<SavedCity> cities) {
+        List<PagerItem> items = new ArrayList<>();
+        if (currentLocationEnabled) {
+            items.add(PagerItem.currentLocation());
+        }
+        if (cities != null) {
+            for (SavedCity city : cities) {
+                items.add(PagerItem.saved(city.cityName));
+            }
+        }
+        pagerAdapter.submitItems(items);
+        boolean hasAnyPage = !items.isEmpty();
+        layoutEmpty.setVisibility(hasAnyPage ? View.GONE : View.VISIBLE);
+        viewPagerCities.setVisibility(hasAnyPage ? View.VISIBLE : View.GONE);
+        pagerDots.setVisibility(items.size() > 1 ? View.VISIBLE : View.GONE);
+
+        if (pendingSwipeAfterAdd != null) {
+            int idx = pagerAdapter.indexOfCity(pendingSwipeAfterAdd);
+            if (idx >= 0) {
+                viewPagerCities.setCurrentItem(idx, true);
+                pendingSwipeAfterAdd = null;
+            }
+        }
     }
 
     private void renderRecentSearches(@androidx.annotation.Nullable List<RecentSearch> items) {
@@ -377,7 +203,7 @@ public class MainActivity extends AppCompatActivity {
                     R.string.recent_search_delete_content_description, entry.cityName));
             chip.setOnClickListener(v -> {
                 etSearchCity.setText(entry.cityName);
-                viewModel.loadRecent(entry.cityName);
+                jumpToOrPinCity(entry.cityName);
                 InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
                 if (imm != null) {
                     imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
@@ -388,67 +214,67 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void renderOfflineBanner(@androidx.annotation.Nullable Boolean servingFromCache) {
-        boolean offline = Boolean.TRUE.equals(servingFromCache);
-        if (!offline) {
-            tvOfflineBanner.setVisibility(View.GONE);
-            return;
-        }
-        Long savedAt = viewModel.getCacheSavedAt().getValue();
-        tvOfflineBanner.setText(formatOfflineBanner(savedAt));
-        tvOfflineBanner.setVisibility(View.VISIBLE);
-    }
-
-    private String formatOfflineBanner(@androidx.annotation.Nullable Long savedAt) {
-        if (savedAt == null) {
-            return getString(R.string.offline_banner_just_now);
-        }
-        long ageMs = Math.max(0L, System.currentTimeMillis() - savedAt);
-        long minutes = ageMs / 60_000L;
-        if (minutes < 1L) {
-            return getString(R.string.offline_banner_just_now);
-        }
-        if (minutes < 60L) {
-            return getString(R.string.offline_banner_minutes, (int) minutes);
-        }
-        long hours = minutes / 60L;
-        if (hours < 24L) {
-            return getString(R.string.offline_banner_hours, (int) hours);
-        }
-        long days = hours / 24L;
-        return getString(R.string.offline_banner_days, (int) days);
-    }
-
-    private void applyPlaceholderTemperatures(@NonNull TemperatureUnit unit) {
-        // The XML uses hardcoded "--°C" placeholders; rewrite them so the unit is consistent
-        // before the first network response arrives.
-        String placeholder = UnitFormatter.temperaturePlaceholder(unit);
-        if (tvTemperature != null && (tvTemperature.getText() == null
-                || tvTemperature.getText().toString().startsWith("--"))) {
-            tvTemperature.setText(placeholder);
-        }
-        if (tvFeelsLike != null && (tvFeelsLike.getText() == null
-                || tvFeelsLike.getText().toString().startsWith("--"))) {
-            tvFeelsLike.setText(placeholder);
-        }
-    }
-
     private void triggerCitySearch(View v) {
         String cityName = etSearchCity.getText().toString().trim();
         if (cityName.isEmpty()) {
             Toast.makeText(this, R.string.toast_enter_city, Toast.LENGTH_SHORT).show();
             return;
         }
+        hideKeyboard(v);
+        viewModel.recordRecentSearch(cityName);
+        jumpToOrPinCity(cityName);
+    }
+
+    /** "+" icon → same as search, but always pins even if just searched. */
+    private void triggerAddCity(View v) {
+        String cityName = etSearchCity.getText().toString().trim();
+        if (cityName.isEmpty()) {
+            Toast.makeText(this, R.string.toast_enter_city, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        hideKeyboard(v);
+        viewModel.recordRecentSearch(cityName);
+        pinCity(cityName);
+    }
+
+    private void hideKeyboard(View v) {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) {
             imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
         }
-        viewModel.loadByCity(cityName);
     }
 
-    private void getLastLocation() {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
-                ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+    /**
+     * If the city is already pinned: just swipe to its page. Otherwise: pin it and the
+     * {@code savedCities} observer will rebuild the pager + swipe via {@link #pendingSwipeAfterAdd}.
+     */
+    private void jumpToOrPinCity(@NonNull String cityName) {
+        int idx = pagerAdapter.indexOfCity(cityName);
+        if (idx >= 0) {
+            viewPagerCities.setCurrentItem(idx, true);
+            return;
+        }
+        pinCity(cityName);
+    }
+
+    private void pinCity(@NonNull String cityName) {
+        pendingSwipeAfterAdd = cityName;
+        viewModel.addSavedCity(cityName);
+        // Cap-reached / already-pinned cases are handled inside the VM. If the city was already
+        // pinned, the observer won't fire (DB unchanged), so we proactively swipe here as a
+        // fallback in case `pendingSwipeAfterAdd` doesn't get consumed.
+        int existing = pagerAdapter.indexOfCity(cityName);
+        if (existing >= 0) {
+            viewPagerCities.setCurrentItem(existing, true);
+            pendingSwipeAfterAdd = null;
+        }
+    }
+
+    private void requestLocationIfNeeded() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
                     new String[]{
                             Manifest.permission.ACCESS_FINE_LOCATION,
@@ -457,9 +283,26 @@ public class MainActivity extends AppCompatActivity {
                     LOCATION_PERMISSION_REQUEST_CODE);
             return;
         }
+        enableCurrentLocationPage();
+        fetchGpsAndDispatch();
+    }
 
-        CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
-        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cancellationTokenSource.getToken())
+    private void enableCurrentLocationPage() {
+        if (currentLocationEnabled) return;
+        currentLocationEnabled = true;
+        // Trigger a rebuild so the GPS page slot appears. Re-use the current saved-cities value.
+        rebuildPager(viewModel.getSavedCities().getValue());
+    }
+
+    private void fetchGpsAndDispatch() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        CancellationTokenSource cts = new CancellationTokenSource();
+        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.getToken())
                 .addOnSuccessListener(this, location -> {
                     if (location == null) {
                         Toast.makeText(MainActivity.this,
@@ -470,7 +313,7 @@ public class MainActivity extends AppCompatActivity {
                     double lat = location.getLatitude();
                     double lon = location.getLongitude();
                     scheduleWeatherAlertWorker(lat, lon);
-                    viewModel.loadByCoord(lat, lon);
+                    viewModel.setCurrentLocation(lat, lon);
                 });
     }
 
@@ -487,304 +330,35 @@ public class MainActivity extends AppCompatActivity {
                 WORKER_UNIQUE_NAME, ExistingPeriodicWorkPolicy.KEEP, request);
     }
 
-    private void renderWeather(WeatherUiState state) {
-        // Drive the inline state UI off the weather LiveData. Forecast errors only Toast — the
-        // primary screen ought to keep showing the current weather even if the forecast fails.
-        if (state.isLoading() && state.getData() == null) {
-            showLoadingState();
-            return;
-        }
-        if (state.isError() && layoutContent.getVisibility() != View.VISIBLE) {
-            // First load failed; inline retry view replaces the content.
-            showErrorState(state.getErrorMessage());
-            return;
-        }
-        if (state.isError()) {
-            // Refresh after a successful load failed; keep showing the old data and Toast.
-            swipeRefresh.setRefreshing(false);
-            Toast.makeText(this, R.string.toast_city_not_found, Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        WeatherResponse data = state.getData();
-        if (data == null) {
-            return;
-        }
-        showContentState();
-
-        String name = data.getName();
-        tvLocation.setText(name == null ? "" : name.toUpperCase(Locale.ROOT));
-
-        lavLocationIcon.setAnimation(state.isCurrentLocation() ? R.raw.anim_location : R.raw.anim_search);
-        lavLocationIcon.playAnimation();
-
-        CurrentWeather main = data.getMain();
-        if (main != null) {
-            tvTemperature.setText(UnitFormatter.formatTemperatureRounded(main.getTemp(), currentUnit));
-            tvHumidity.setText(String.format(Locale.getDefault(), "%d%%", main.getHumidity()));
-            tvFeelsLike.setText(UnitFormatter.formatTemperatureRounded(main.getFeelsLike(), currentUnit));
-            tvPressure.setText(getString(R.string.pressure_value_format, main.getPressure()));
-        }
-
-        List<WeatherDescription> descriptions = data.getWeather();
-        if (descriptions != null && !descriptions.isEmpty()) {
-            WeatherDescription first = descriptions.get(0);
-            tvDescription.setText(capitalize(first.getDescription()));
-            lavWeatherIcon.setAnimation(WeatherIconMapper.rawForIconCode(first.getIcon()));
-            lavWeatherIcon.playAnimation();
-            applyDynamicGradient(first.getIcon());
-        }
-
-        currentCityTimezoneOffsetSec = data.getTimezone();
-        bindSunCycle(data.getSys(), data.getTimezone());
-        bindWind(data.getWind());
-        bindVisibility(data.getVisibility());
-    }
-
-    private void renderForecast(ForecastUiState state) {
-        if (state.isError()) {
-            Toast.makeText(this, R.string.toast_forecast_load_error, Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (state.isLoading()) {
-            return;
-        }
-        List<ForecastItem> items = state.getItems();
-        if (forecastAdapter == null) {
-            forecastAdapter = new ForecastAdapter(this, items, currentUnit);
-            rvForecast.setAdapter(forecastAdapter);
-        } else {
-            forecastAdapter.setTemperatureUnit(currentUnit);
-            forecastAdapter.submitList(items);
-        }
-        drawTemperatureChart(items);
-
-        // Aggregate the same hourly items into per-day buckets and feed the daily adapter.
-        // The aggregator uses the city's UTC offset so day boundaries match the city, not the device.
-        List<DailyForecast> dailyItems = DailyForecastAggregator.aggregate(
-                items, currentCityTimezoneOffsetSec);
-        if (dailyForecastAdapter == null) {
-            dailyForecastAdapter = new DailyForecastAdapter(this, dailyItems);
-            rvDailyForecast.setAdapter(dailyForecastAdapter);
-        } else {
-            dailyForecastAdapter.submitList(dailyItems);
-        }
-    }
-
-    private void showLoadingState() {
-        // Initial load: hide content and show centered spinner. Pull-to-refresh has its own
-        // SwipeRefreshLayout spinner, so we do NOT also show the inline ProgressBar in that case.
-        if (layoutContent.getVisibility() == View.VISIBLE) {
-            return;
-        }
-        layoutLoading.setVisibility(View.VISIBLE);
-        layoutError.setVisibility(View.GONE);
-        layoutContent.setVisibility(View.GONE);
-    }
-
-    private void showErrorState(@androidx.annotation.Nullable String message) {
-        swipeRefresh.setRefreshing(false);
-        layoutLoading.setVisibility(View.GONE);
-        layoutContent.setVisibility(View.GONE);
-        layoutError.setVisibility(View.VISIBLE);
-        if (message == null || message.isEmpty()) {
-            tvErrorMessage.setText(R.string.error_default_message);
-        } else {
-            tvErrorMessage.setText(message);
-        }
-    }
-
-    private void showContentState() {
-        swipeRefresh.setRefreshing(false);
-        layoutLoading.setVisibility(View.GONE);
-        layoutError.setVisibility(View.GONE);
-        layoutContent.setVisibility(View.VISIBLE);
-    }
-
-    private void bindSunCycle(@androidx.annotation.Nullable Sys sys, int timezoneOffsetSec) {
-        if (sys == null || (sys.getSunrise() == 0L && sys.getSunset() == 0L)) {
-            layoutSunCycle.setVisibility(View.GONE);
-            return;
-        }
-        tvSunrise.setText(getString(R.string.sunrise_value_format,
-                formatCityLocalTime(sys.getSunrise(), timezoneOffsetSec)));
-        tvSunset.setText(getString(R.string.sunset_value_format,
-                formatCityLocalTime(sys.getSunset(), timezoneOffsetSec)));
-        layoutSunCycle.setVisibility(View.VISIBLE);
-    }
-
-    /**
-     * Crossfade the screen background to a gradient that matches the OWM icon code. The first
-     * call snaps directly (no transition from the static XML background); subsequent calls fade
-     * over {@link #GRADIENT_FADE_DURATION_MS} ms.
-     */
-    private void applyDynamicGradient(@androidx.annotation.Nullable String iconCode) {
-        int[] next = WeatherGradientMapper.colorsForIconCode(iconCode);
-        if (currentGradientColors != null && Arrays.equals(currentGradientColors, next)) {
-            return;
-        }
-        GradientDrawable target = new GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM, next.clone());
-        if (currentGradientColors == null) {
-            // First render: snap. Animating from the static XML drawable produces an awkward
-            // fade since the orientation/stops don't match exactly.
-            swipeRefresh.setBackground(target);
-        } else {
-            GradientDrawable from = new GradientDrawable(
-                    GradientDrawable.Orientation.TOP_BOTTOM, currentGradientColors.clone());
-            TransitionDrawable transition = new TransitionDrawable(new Drawable[]{from, target});
-            transition.setCrossFadeEnabled(true);
-            swipeRefresh.setBackground(transition);
-            transition.startTransition(GRADIENT_FADE_DURATION_MS);
-        }
-        currentGradientColors = next;
-    }
-
-    private void bindWind(@androidx.annotation.Nullable Wind wind) {
-        if (wind == null) {
-            tvWind.setText(R.string.placeholder_dash);
-            return;
-        }
-        // m/s when in metric units, mph when in imperial. OWM returns the speed in the unit it
-        // was asked for, so we just append the matching suffix instead of converting.
-        tvWind.setText(UnitFormatter.formatWind(wind.getSpeed(), currentUnit));
-    }
-
-    private void bindVisibility(int visibilityMeters) {
-        if (visibilityMeters <= 0) {
-            tvVisibility.setText(R.string.placeholder_dash);
-            return;
-        }
-        if (visibilityMeters >= MAX_VISIBILITY_METERS) {
-            tvVisibility.setText(getString(R.string.visibility_value_km_format,
-                    visibilityMeters / 1000));
-        } else {
-            tvVisibility.setText(getString(R.string.visibility_value_km_decimal_format,
-                    visibilityMeters / 1000d));
-        }
-    }
-
-    /**
-     * Render a Unix timestamp (seconds, UTC) into the hour:minute that the city itself is seeing.
-     * We don't use the device's TimeZone — sunrise should look right even when the user searches
-     * for another city.
-     */
-    private static String formatCityLocalTime(long unixSeconds, int timezoneOffsetSec) {
-        long localMillis = (unixSeconds + timezoneOffsetSec) * 1000L;
-        SimpleDateFormat fmt = new SimpleDateFormat("HH:mm", Locale.getDefault());
-        fmt.setTimeZone(TimeZone.getTimeZone("UTC"));
-        return fmt.format(new Date(localMillis));
-    }
-
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode,
+                                           @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                getLastLocation();
+                enableCurrentLocationPage();
+                fetchGpsAndDispatch();
             } else {
                 Toast.makeText(this, R.string.toast_location_permission_required, Toast.LENGTH_SHORT).show();
             }
         } else if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
             if (grantResults.length == 0 || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this,
-                        R.string.toast_notification_permission_denied,
+                Toast.makeText(this, R.string.toast_notification_permission_denied,
                         Toast.LENGTH_SHORT).show();
             }
         }
     }
 
-    private static String capitalize(String text) {
-        if (text == null || text.isEmpty()) {
-            return "";
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (dotsMediator != null) {
+            dotsMediator.detach();
+            dotsMediator = null;
         }
-        return text.substring(0, 1).toUpperCase(Locale.ROOT) + text.substring(1);
-    }
-
-    private void drawTemperatureChart(List<ForecastItem> forecastList) {
-        if (forecastList == null || forecastList.isEmpty()) {
-            lineChartTemp.clear();
-            lineChartTemp.invalidate();
-            return;
-        }
-
-        List<Entry> entries = new ArrayList<>();
-        final List<String> hourLabels = new ArrayList<>();
-        int count = Math.min(forecastList.size(), CHART_POINTS);
-        SimpleDateFormat apiFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
-        apiFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
-        SimpleDateFormat hourFormat = new SimpleDateFormat("HH'h'", Locale.getDefault());
-        hourFormat.setTimeZone(cityTimeZoneOrDefault());
-
-        for (int i = 0; i < count; i++) {
-            ForecastItem item = forecastList.get(i);
-            CurrentWeather m = item.getMain();
-            if (m == null) {
-                continue;
-            }
-            entries.add(new Entry(entries.size(), (float) m.getTemp()));
-            hourLabels.add(formatHourLabel(item.getDtTxt(), apiFormat, hourFormat));
-        }
-
-        LineDataSet dataSet = new LineDataSet(entries, getString(R.string.chart_temp_trend_label));
-        dataSet.setColor(android.graphics.Color.WHITE);
-        dataSet.setValueTextColor(android.graphics.Color.WHITE);
-        dataSet.setValueTextSize(12f);
-        dataSet.setLineWidth(3f);
-        dataSet.setCircleColor(android.graphics.Color.YELLOW);
-        dataSet.setCircleRadius(5f);
-        dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-        dataSet.setDrawFilled(true);
-        dataSet.setFillColor(android.graphics.Color.WHITE);
-
-        lineChartTemp.setData(new LineData(dataSet));
-        lineChartTemp.getDescription().setEnabled(false);
-        lineChartTemp.getAxisRight().setEnabled(false);
-        lineChartTemp.getAxisLeft().setEnabled(false);
-        lineChartTemp.getAxisLeft().setSpaceTop(20f);
-        lineChartTemp.getAxisLeft().setSpaceBottom(20f);
-
-        XAxis xAxis = lineChartTemp.getXAxis();
-        xAxis.setSpaceMin(0.3f);
-        xAxis.setSpaceMax(0.3f);
-        xAxis.setTextColor(android.graphics.Color.WHITE);
-        xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxis.setDrawGridLines(false);
-        xAxis.setGranularity(1f);
-        xAxis.setLabelCount(hourLabels.size(), false);
-        xAxis.setValueFormatter(new ValueFormatter() {
-            @Override
-            public String getAxisLabel(float value, com.github.mikephil.charting.components.AxisBase axis) {
-                int idx = Math.round(value);
-                if (idx < 0 || idx >= hourLabels.size()) return "";
-                return hourLabels.get(idx);
-            }
-        });
-        lineChartTemp.getLegend().setTextColor(android.graphics.Color.WHITE);
-        lineChartTemp.invalidate();
-    }
-
-    private TimeZone cityTimeZoneOrDefault() {
-        if (currentCityTimezoneOffsetSec == 0) {
-            return TimeZone.getDefault();
-        }
-        // GMT[+/-]hh:mm; SimpleDateFormat respects this.
-        int totalMinutes = currentCityTimezoneOffsetSec / 60;
-        int hours = Math.abs(totalMinutes) / 60;
-        int minutes = Math.abs(totalMinutes) % 60;
-        String sign = currentCityTimezoneOffsetSec >= 0 ? "+" : "-";
-        return TimeZone.getTimeZone(String.format(Locale.US, "GMT%s%02d:%02d", sign, hours, minutes));
-    }
-
-    private static String formatHourLabel(@androidx.annotation.Nullable String dtTxt,
-                                          SimpleDateFormat apiFormat,
-                                          SimpleDateFormat hourFormat) {
-        if (dtTxt == null || dtTxt.isEmpty()) return "";
-        try {
-            Date parsed = apiFormat.parse(dtTxt);
-            return parsed == null ? "" : hourFormat.format(parsed);
-        } catch (ParseException e) {
-            return "";
+        if (viewPagerCities != null) {
+            viewPagerCities.setAdapter(null);
         }
     }
 }

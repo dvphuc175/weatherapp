@@ -10,112 +10,62 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
 import com.example.weather_application.data.UserPreferences;
-import com.example.weather_application.data.WeatherRepository;
-import com.example.weather_application.data.WeatherRepository.Cancellable;
-import com.example.weather_application.data.WeatherRepository.ResultCallback;
 import com.example.weather_application.data.local.AppDatabase;
-import com.example.weather_application.data.local.CachedSnapshot;
 import com.example.weather_application.data.local.CachedSnapshotDao;
 import com.example.weather_application.data.local.RecentSearch;
 import com.example.weather_application.data.local.RecentSearchDao;
-import com.example.weather_application.models.ForecastItem;
-import com.example.weather_application.models.ForecastResponse;
-import com.example.weather_application.models.WeatherResponse;
+import com.example.weather_application.data.local.SavedCity;
+import com.example.weather_application.data.local.SavedCityDao;
 import com.example.weather_application.util.TemperatureUnit;
-import com.google.gson.Gson;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * Activity-scoped ViewModel. Owns the cross-page concerns: which cities are pinned, the active
+ * temperature unit, the recent-search list, and the current GPS coord. Per-page weather state
+ * lives in {@link CityViewModel}.
+ *
+ * <p>The unit-pref listener is the central place that wipes the offline cache when the user
+ * flips °C/°F — individual {@link CityViewModel} instances just react to the change by reloading.
+ */
 public class MainViewModel extends AndroidViewModel {
 
-    private final WeatherRepository repository;
     private final UserPreferences userPreferences;
     private final RecentSearchDao recentSearchDao;
+    private final SavedCityDao savedCityDao;
     private final CachedSnapshotDao cachedSnapshotDao;
     private final ExecutorService diskIo = Executors.newSingleThreadExecutor();
-    private final Gson gson = new Gson();
 
-    private final MutableLiveData<WeatherUiState> weather = new MutableLiveData<>();
-    private final MutableLiveData<ForecastUiState> forecast = new MutableLiveData<>();
-    /** Live list of recent successful searches, most-recent-first. */
-    private final LiveData<List<RecentSearch>> recentSearches;
-    /** Live current temperature unit so the UI can refresh when the user flips it from Settings. */
     private final MutableLiveData<TemperatureUnit> temperatureUnit = new MutableLiveData<>();
-    /** {@code true} when the currently-displayed data was loaded from the offline cache. */
-    private final MutableLiveData<Boolean> servingFromCache = new MutableLiveData<>(false);
-    /** Wall-clock ms when the cache row was saved. {@code null} unless serving from cache. */
-    private final MutableLiveData<Long> cacheSavedAt = new MutableLiveData<>(null);
+    private final MutableLiveData<LatLon> currentLocation = new MutableLiveData<>();
+    private final LiveData<List<RecentSearch>> recentSearches;
+    private final LiveData<List<SavedCity>> savedCities;
 
-    private final List<Cancellable> inFlight = new ArrayList<>();
-
-    /**
-     * Monotonically increases on every {@link #loadByCoord}/{@link #loadByCity}/{@link #cancelInFlight}.
-     * Callbacks captured before the bump are stale: they must drop their result instead of overwriting
-     * a newer state. Guards against the race where a slow first request finishes after a fresh one.
-     */
-    private int loadGeneration;
-
-    /** Last successful query, kept so {@link #refresh()} can re-issue it (e.g. pull-to-refresh, retry). */
-    @Nullable
-    private LastQuery lastQuery;
-
-    /** Latest payloads, kept so we can snapshot to cache as a pair on the second arrival. */
-    @Nullable
-    private WeatherResponse latestWeather;
-    @Nullable
-    private ForecastResponse latestForecast;
-
-    /** Listens for unit toggles in {@code SettingsBottomSheet}; assigned in the constructor so
-     *  the lambda captures fully-initialized {@code userPreferences} / {@code cachedSnapshotDao}. */
     @NonNull
     private final SharedPreferences.OnSharedPreferenceChangeListener unitListener;
 
     public MainViewModel(@NonNull Application application) {
-        this(application, new WeatherRepository(),
-                UserPreferences.get(application),
-                AppDatabase.get(application));
-    }
-
-    MainViewModel(@NonNull Application application,
-                  @NonNull WeatherRepository repository,
-                  @NonNull UserPreferences userPreferences,
-                  @NonNull AppDatabase database) {
         super(application);
-        this.repository = repository;
-        this.userPreferences = userPreferences;
-        this.recentSearchDao = database.recentSearchDao();
-        this.cachedSnapshotDao = database.cachedSnapshotDao();
+        AppDatabase db = AppDatabase.get(application);
+        this.userPreferences = UserPreferences.get(application);
+        this.recentSearchDao = db.recentSearchDao();
+        this.savedCityDao = db.savedCityDao();
+        this.cachedSnapshotDao = db.cachedSnapshotDao();
         this.recentSearches = recentSearchDao.observeRecent(RecentSearchDao.MAX_ENTRIES);
+        this.savedCities = savedCityDao.observeOrdered();
         this.temperatureUnit.setValue(userPreferences.getTemperatureUnit());
         this.unitListener = (sp, key) -> {
             if (UserPreferences.keyTemperatureUnit().equals(key)) {
                 TemperatureUnit next = this.userPreferences.getTemperatureUnit();
                 temperatureUnit.postValue(next);
-                // Invalidate the cache — it's keyed to the old unit's units= param.
+                // Cache is keyed on the old units= param. Wipe it so each page falls through
+                // to a fresh fetch with the new unit.
                 diskIo.execute(cachedSnapshotDao::deleteAll);
-                refresh();
             }
         };
         userPreferences.registerListener(unitListener);
-    }
-
-    @NonNull
-    public LiveData<WeatherUiState> getWeather() {
-        return weather;
-    }
-
-    @NonNull
-    public LiveData<ForecastUiState> getForecast() {
-        return forecast;
-    }
-
-    @NonNull
-    public LiveData<List<RecentSearch>> getRecentSearches() {
-        return recentSearches;
     }
 
     @NonNull
@@ -124,157 +74,34 @@ public class MainViewModel extends AndroidViewModel {
     }
 
     @NonNull
-    public LiveData<Boolean> getServingFromCache() {
-        return servingFromCache;
+    public LiveData<List<RecentSearch>> getRecentSearches() {
+        return recentSearches;
     }
 
     @NonNull
-    public LiveData<Long> getCacheSavedAt() {
-        return cacheSavedAt;
+    public LiveData<List<SavedCity>> getSavedCities() {
+        return savedCities;
     }
 
-    public void loadByCoord(double lat, double lon) {
-        lastQuery = LastQuery.coord(lat, lon);
-        int gen = startNewGeneration();
-        TemperatureUnit unit = currentUnit();
-        weather.postValue(WeatherUiState.loading());
-        forecast.postValue(ForecastUiState.loading());
-        track(repository.getCurrentWeatherByCoord(lat, lon, unit, weatherCallback(true, gen)));
-        track(repository.getForecastByCoord(lat, lon, unit, forecastCallback(gen)));
+    @NonNull
+    public LiveData<LatLon> getCurrentLocation() {
+        return currentLocation;
     }
 
-    public void loadByCity(@NonNull String city) {
-        lastQuery = LastQuery.city(city);
-        int gen = startNewGeneration();
-        TemperatureUnit unit = currentUnit();
-        weather.postValue(WeatherUiState.loading());
-        forecast.postValue(ForecastUiState.loading());
-        track(repository.getCurrentWeatherByCity(city, unit, weatherCallback(false, gen)));
-        track(repository.getForecastByCity(city, unit, forecastCallback(gen)));
+    /** Called by the activity once the FusedLocation API returns a fix. */
+    public void setCurrentLocation(double lat, double lon) {
+        currentLocation.setValue(new LatLon(lat, lon));
     }
 
     /**
-     * Re-issue the last successful query. Wired to pull-to-refresh, the inline error retry
-     * button, and the network-regained callback. No-op if no query has been issued yet.
+     * Record a successful search. Bumps {@code lastQueriedAt} (or inserts if new) and evicts
+     * beyond the cap. Called by the activity after any successful city load from the search bar
+     * or a recent chip — the per-page {@link CityViewModel} doesn't know about recent searches.
      */
-    public void refresh() {
-        LastQuery q = lastQuery;
-        if (q == null) return;
-        if (q.city != null) {
-            loadByCity(q.city);
-        } else {
-            loadByCoord(q.lat, q.lon);
-        }
-    }
-
-    /** Used by the Settings sheet's "Clear" action. Runs on a disk-I/O thread. */
-    public void clearRecentSearches() {
-        diskIo.execute(recentSearchDao::deleteAll);
-    }
-
-    /** Delete a single recent-search row — wired to the chip's close icon. */
-    public void removeRecentSearch(@NonNull String cityName) {
-        diskIo.execute(() -> recentSearchDao.deleteByName(cityName));
-    }
-
-    /** Tap on a recent chip → re-load. */
-    public void loadRecent(@NonNull String cityName) {
-        loadByCity(cityName);
-    }
-
-    @Override
-    protected void onCleared() {
-        super.onCleared();
-        cancelInFlight();
-        userPreferences.unregisterListener(unitListener);
-        diskIo.shutdown();
-    }
-
-    @NonNull
-    private TemperatureUnit currentUnit() {
-        TemperatureUnit unit = temperatureUnit.getValue();
-        return unit != null ? unit : userPreferences.getTemperatureUnit();
-    }
-
-    private synchronized int startNewGeneration() {
-        cancelInFlight();
-        latestWeather = null;
-        latestForecast = null;
-        return ++loadGeneration;
-    }
-
-    private synchronized boolean isStale(int gen) {
-        return gen != loadGeneration;
-    }
-
-    private ResultCallback<WeatherResponse> weatherCallback(final boolean isCurrentLocation,
-                                                            final int gen) {
-        return new ResultCallback<WeatherResponse>() {
-            @Override
-            public void onSuccess(@NonNull WeatherResponse data) {
-                if (isStale(gen)) return;
-                servingFromCache.postValue(false);
-                cacheSavedAt.postValue(null);
-                latestWeather = data;
-                weather.postValue(WeatherUiState.success(data, isCurrentLocation));
-                recordRecentSearch(data.getName());
-                persistSnapshotIfReady();
-            }
-
-            @Override
-            public void onError(@Nullable String message) {
-                if (isStale(gen)) return;
-                tryServeFromCache(message, isCurrentLocation);
-            }
-        };
-    }
-
-    private ResultCallback<ForecastResponse> forecastCallback(final int gen) {
-        return new ResultCallback<ForecastResponse>() {
-            @Override
-            public void onSuccess(@NonNull ForecastResponse data) {
-                if (isStale(gen)) return;
-                latestForecast = data;
-                List<ForecastItem> items = data.getList();
-                forecast.postValue(ForecastUiState.success(
-                        items == null ? Collections.<ForecastItem>emptyList() : items));
-                persistSnapshotIfReady();
-            }
-
-            @Override
-            public void onError(@Nullable String message) {
-                if (isStale(gen)) return;
-                // If we already served weather from cache, the cached forecast was already
-                // posted by tryServeFromCache() — suppress to keep the offline view intact.
-                if (Boolean.TRUE.equals(servingFromCache.getValue())) {
-                    return;
-                }
-                forecast.postValue(ForecastUiState.error(message == null ? "" : message));
-            }
-        };
-    }
-
-    /** Snapshot both halves to disk once we have a successful weather + forecast pair. */
-    private void persistSnapshotIfReady() {
-        final WeatherResponse w = latestWeather;
-        final ForecastResponse f = latestForecast;
-        if (w == null || f == null) return;
-        final TemperatureUnit unit = currentUnit();
-        final String cityName = w.getName();
-        diskIo.execute(() -> cachedSnapshotDao.upsert(new CachedSnapshot(
-                CachedSnapshot.SINGLE_ROW_KEY,
-                cityName,
-                unit.owmUnitsParam,
-                gson.toJson(w),
-                gson.toJson(f),
-                System.currentTimeMillis())));
-    }
-
-    private void recordRecentSearch(@Nullable String cityName) {
+    public void recordRecentSearch(@Nullable String cityName) {
         if (cityName == null || cityName.isEmpty()) return;
         diskIo.execute(() -> {
             recentSearchDao.upsert(new RecentSearch(cityName, System.currentTimeMillis()));
-            // Evict beyond the cap, oldest first.
             List<RecentSearch> all = recentSearchDao.getAllSync();
             for (int i = RecentSearchDao.MAX_ENTRIES; i < all.size(); i++) {
                 recentSearchDao.deleteByName(all.get(i).cityName);
@@ -282,71 +109,57 @@ public class MainViewModel extends AndroidViewModel {
         });
     }
 
+    public void clearRecentSearches() {
+        diskIo.execute(recentSearchDao::deleteAll);
+    }
+
+    public void removeRecentSearch(@NonNull String cityName) {
+        diskIo.execute(() -> recentSearchDao.deleteByName(cityName));
+    }
+
     /**
-     * Network failed and we don't have data yet. Try to deserialize the last cached snapshot
-     * (assuming its units match the current unit pref — if they don't, the cache was already
-     * wiped by {@link #unitListener}). If anything is missing, fall through to a normal error.
+     * Pin a new city to the pager. {@code displayOrder} is set to {@code current count + 1} so
+     * it lands at the end of the list. No-op if the cap is reached or the city is already pinned.
      */
-    private void tryServeFromCache(@Nullable String errorMessage,
-                                   final boolean isCurrentLocation) {
-        final TemperatureUnit currentUnit = currentUnit();
+    public void addSavedCity(@NonNull String cityName) {
+        if (cityName.isEmpty()) return;
         diskIo.execute(() -> {
-            CachedSnapshot snap = cachedSnapshotDao.getByIdSync(CachedSnapshot.SINGLE_ROW_KEY);
-            if (snap == null || snap.weatherJson == null || snap.forecastJson == null
-                    || !currentUnit.owmUnitsParam.equals(snap.units)) {
-                weather.postValue(WeatherUiState.error(errorMessage == null ? "" : errorMessage));
-                return;
-            }
-            try {
-                WeatherResponse w = gson.fromJson(snap.weatherJson, WeatherResponse.class);
-                ForecastResponse f = gson.fromJson(snap.forecastJson, ForecastResponse.class);
-                if (w == null || f == null) {
-                    weather.postValue(WeatherUiState.error(errorMessage == null ? "" : errorMessage));
-                    return;
-                }
-                latestWeather = w;
-                latestForecast = f;
-                servingFromCache.postValue(true);
-                cacheSavedAt.postValue(snap.savedAt);
-                weather.postValue(WeatherUiState.success(w, isCurrentLocation));
-                List<ForecastItem> items = f.getList();
-                forecast.postValue(ForecastUiState.success(
-                        items == null ? Collections.<ForecastItem>emptyList() : items));
-            } catch (Exception parseError) {
-                weather.postValue(WeatherUiState.error(errorMessage == null ? "" : errorMessage));
-            }
+            if (savedCityDao.countByName(cityName) > 0) return;
+            int count = savedCityDao.count();
+            if (count >= SavedCityDao.MAX_ENTRIES) return;
+            savedCityDao.upsert(new SavedCity(cityName, count + 1, System.currentTimeMillis()));
         });
     }
 
-    private synchronized void track(@NonNull Cancellable c) {
-        inFlight.add(c);
+    /** Async existence check — caller is notified on the disk-IO thread. */
+    public void hasSavedCity(@NonNull String cityName, @NonNull SavedCityResultCallback result) {
+        diskIo.execute(() -> result.onResult(savedCityDao.countByName(cityName) > 0));
     }
 
-    private synchronized void cancelInFlight() {
-        for (Cancellable c : inFlight) {
-            c.cancel();
-        }
-        inFlight.clear();
+    public void removeSavedCity(@NonNull String cityName) {
+        diskIo.execute(() -> savedCityDao.deleteByName(cityName));
     }
 
-    /** Snapshot of the last issued query, used by {@link #refresh()}. */
-    private static final class LastQuery {
-        @Nullable final String city;
-        final double lat;
-        final double lon;
+    @Override
+    protected void onCleared() {
+        super.onCleared();
+        userPreferences.unregisterListener(unitListener);
+        diskIo.shutdown();
+    }
 
-        private LastQuery(@Nullable String city, double lat, double lon) {
-            this.city = city;
+    /** Immutable lat/lon pair, posted whenever the activity gets a new GPS fix. */
+    public static final class LatLon {
+        public final double lat;
+        public final double lon;
+
+        public LatLon(double lat, double lon) {
             this.lat = lat;
             this.lon = lon;
         }
+    }
 
-        static LastQuery city(@NonNull String city) {
-            return new LastQuery(city, 0d, 0d);
-        }
-
-        static LastQuery coord(double lat, double lon) {
-            return new LastQuery(null, lat, lon);
-        }
+    /** Functional callback for {@link #hasSavedCity}. Avoids a {@code java.util.function} dep. */
+    public interface SavedCityResultCallback {
+        void onResult(boolean exists);
     }
 }

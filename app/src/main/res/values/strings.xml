@@ -79,4 +79,12 @@
     <string name="offline_banner_minutes">Đang offline · Cập nhật %1$d phút trước</string>
     <string name="offline_banner_hours">Đang offline · Cập nhật %1$d giờ trước</string>
     <string name="offline_banner_days">Đang offline · Cập nhật %1$d ngày trước</string>
+
+    <!-- Multi-city pager (G7) -->
+    <string name="add_city_action">Thêm thành phố</string>
+    <string name="empty_pager_title">Chưa có thành phố nào</string>
+    <string name="empty_pager_subtitle">Nhập tên thành phố ở trên rồi bấm nút + để bắt đầu.</string>
+    <string name="settings_saved_cities_label">Thành phố đã lưu</string>
+    <string name="settings_saved_cities_empty">Bạn chưa lưu thành phố nào.</string>
+    <string name="settings_saved_city_remove_content_description">Xoá %1$s khỏi danh sách thành phố</string>
 </resources>
