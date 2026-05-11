@@ -1,20 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Drawable used as `app:tabBackground` for the multi-city pager's dot indicator. Each tab is
-  drawn as a circle whose color depends on whether that tab is selected. Selected = white;
-  unselected = white with 50% alpha.
+  Drawable used as `app:tabBackground` for the multi-city pager dots. The shape is wrapped in a
+  layer-list with `gravity="center"` and an explicit `size` so the dot stays a fixed-diameter
+  circle regardless of the tab's measured bounds. (Without the layer-list, TabLayout stretches
+  the drawable to fill the tab, which makes the dot look like a tall pill.)
 -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_selected="true">
-        <shape android:shape="oval">
-            <size android:width="6dp" android:height="6dp" />
-            <solid android:color="@color/text_primary_on_brand" />
-        </shape>
+        <layer-list>
+            <item android:gravity="center">
+                <shape android:shape="oval">
+                    <size android:width="8dp" android:height="8dp" />
+                    <solid android:color="@color/text_primary_on_brand" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
     <item>
-        <shape android:shape="oval">
-            <size android:width="6dp" android:height="6dp" />
-            <solid android:color="#66FFFFFF" />
-        </shape>
+        <layer-list>
+            <item android:gravity="center">
+                <shape android:shape="oval">
+                    <size android:width="8dp" android:height="8dp" />
+                    <solid android:color="#66FFFFFF" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
 </selector>

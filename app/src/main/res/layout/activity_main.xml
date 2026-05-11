@@ -1,145 +1,151 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Activity shell for the multi-city pager. Owns the top bar (search + settings), the
-  recent-searches chips (revealed on search focus only), and a {@code ViewPager2}. Each page is
-  a {@code CityWeatherFragment} that handles its own gradient / loading-error-content states /
-  offline banner.
+  Activity shell for the multi-city pager. The pager fills the full screen so each
+  CityWeatherFragment's gradient bleeds edge-to-edge (no opaque seam above the search bar).
+  The search row + recent chips + dots all overlay the pager — the pager's gradient shows
+  through them.
 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/layoutActivityRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="@drawable/bg_gradient_subtle">
 
-    <LinearLayout
-        android:id="@+id/layoutSearch"
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/viewPagerCities"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="20dp"
-        android:layout_marginTop="12dp"
-        android:layout_marginBottom="4dp"
-        android:background="@android:color/transparent"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:layout_height="match_parent" />
 
-        <EditText
-            android:id="@+id/etSearchCity"
-            android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_weight="1"
-            android:hint="@string/search_city_hint"
-            android:textColorHint="@color/text_secondary_on_brand"
+    <!-- Empty state — shown when the user has no pinned cities AND no GPS permission. -->
+    <LinearLayout
+        android:id="@+id/layoutEmpty"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp"
+        android:visibility="gone"
+        tools:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="@string/empty_pager_title"
             android:textColor="@color/text_primary_on_brand"
-            android:background="@drawable/bg_search_field"
-            android:paddingHorizontal="16dp"
-            android:textSize="15sp"
-            android:maxLines="1"
-            android:inputType="text"
-            android:imeOptions="actionSearch"
-            android:autofillHints="postalAddress" />
+            android:textSize="16sp" />
 
-        <ImageView
-            android:id="@+id/ivSearch"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:layout_marginStart="12dp"
-            android:src="@android:drawable/ic_menu_search"
-            android:contentDescription="@string/search_action"
-            android:clickable="true"
-            android:focusable="true"
-            app:tint="@color/icon_on_brand" />
-
-        <ImageView
-            android:id="@+id/ivSettings"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:layout_marginStart="12dp"
-            android:src="@android:drawable/ic_menu_preferences"
-            android:contentDescription="@string/settings_action"
-            android:padding="0dp"
-            android:clickable="true"
-            android:focusable="true"
-            app:tint="@color/icon_on_brand" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:text="@string/empty_pager_subtitle"
+            android:textColor="@color/text_secondary_on_brand"
+            android:textSize="13sp" />
     </LinearLayout>
 
     <!--
-      Recent-search chips. Hidden by default; shown only while the search EditText has focus
-      AND there is at least one recent entry. Background transparent so the underlying page
-      gradient bleeds through.
+      Top bar: search row + recent chips. Container holds both so the status-bar inset can be
+      applied to a single view. The container has no background so the pager's gradient bleeds
+      through; only the EditText itself draws a subtle translucent pill.
     -->
-    <HorizontalScrollView
-        android:id="@+id/scrollRecentSearches"
+    <LinearLayout
+        android:id="@+id/layoutTopBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="20dp"
-        android:layout_marginBottom="8dp"
-        android:background="@android:color/transparent"
-        android:scrollbars="none"
-        android:visibility="gone"
-        tools:visibility="visible">
+        android:layout_gravity="top"
+        android:orientation="vertical"
+        android:background="@android:color/transparent">
 
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/chipGroupRecent"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:singleLine="true"
-            app:chipSpacingHorizontal="8dp" />
-    </HorizontalScrollView>
-
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <androidx.viewpager2.widget.ViewPager2
-            android:id="@+id/viewPagerCities"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-        <!-- Empty state — shown when the user has no pinned cities AND no GPS permission. -->
         <LinearLayout
-            android:id="@+id/layoutEmpty"
+            android:id="@+id/layoutSearch"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:padding="32dp"
-            android:visibility="gone"
-            tools:visibility="gone">
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="20dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="4dp"
+            android:background="@android:color/transparent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="@string/empty_pager_title"
+            <EditText
+                android:id="@+id/etSearchCity"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:hint="@string/search_city_hint"
+                android:textColorHint="@color/text_secondary_on_brand"
                 android:textColor="@color/text_primary_on_brand"
-                android:textSize="16sp" />
+                android:background="@drawable/bg_search_field"
+                android:paddingHorizontal="16dp"
+                android:textSize="15sp"
+                android:maxLines="1"
+                android:inputType="text"
+                android:imeOptions="actionSearch"
+                android:autofillHints="postalAddress" />
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:gravity="center"
-                android:text="@string/empty_pager_subtitle"
-                android:textColor="@color/text_secondary_on_brand"
-                android:textSize="13sp" />
+            <ImageView
+                android:id="@+id/ivSearch"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginStart="12dp"
+                android:src="@android:drawable/ic_menu_search"
+                android:contentDescription="@string/search_action"
+                android:clickable="true"
+                android:focusable="true"
+                app:tint="@color/icon_on_brand" />
+
+            <ImageView
+                android:id="@+id/ivSettings"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginStart="12dp"
+                android:src="@android:drawable/ic_menu_preferences"
+                android:contentDescription="@string/settings_action"
+                android:padding="0dp"
+                android:clickable="true"
+                android:focusable="true"
+                app:tint="@color/icon_on_brand" />
         </LinearLayout>
 
-        <com.google.android.material.tabs.TabLayout
-            android:id="@+id/pagerDots"
-            android:layout_width="wrap_content"
+        <!--
+          Recent-search chips. Hidden by default; shown only while the search EditText has focus
+          AND there is at least one recent entry. Transparent so the page gradient shows through.
+        -->
+        <HorizontalScrollView
+            android:id="@+id/scrollRecentSearches"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="bottom|center_horizontal"
-            android:layout_marginBottom="10dp"
+            android:layout_marginHorizontal="20dp"
+            android:layout_marginBottom="8dp"
             android:background="@android:color/transparent"
-            app:tabBackground="@drawable/pager_dot_selector"
-            app:tabGravity="center"
-            app:tabIndicatorHeight="0dp"
-            app:tabMinWidth="0dp"
-            app:tabPaddingStart="3dp"
-            app:tabPaddingEnd="3dp" />
-    </FrameLayout>
-</LinearLayout>
+            android:scrollbars="none"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/chipGroupRecent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:singleLine="true"
+                app:chipSpacingHorizontal="8dp" />
+        </HorizontalScrollView>
+    </LinearLayout>
+
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/pagerDots"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="10dp"
+        android:background="@android:color/transparent"
+        app:tabBackground="@drawable/pager_dot_selector"
+        app:tabGravity="center"
+        app:tabIndicatorHeight="0dp"
+        app:tabMinWidth="0dp"
+        app:tabPaddingStart="4dp"
+        app:tabPaddingEnd="4dp" />
+</FrameLayout>

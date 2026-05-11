@@ -15,6 +15,9 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -74,6 +77,9 @@ public class CityWeatherFragment extends Fragment {
     private static final int MAX_VISIBILITY_METERS = 10_000;
     private static final int GRADIENT_FADE_DURATION_MS = 600;
     private static final String STATE_DAILY_MODE = "state_daily_mode";
+    /** Approximate height of the floating top bar (search row + margins). Used to pad the
+     *  scrollable content so it isn't hidden under the activity's overlay. */
+    private static final int TOP_BAR_OVERLAY_DP = 64;
 
     /** Build a fragment bound to a saved city name. */
     @NonNull
@@ -107,6 +113,7 @@ public class CityWeatherFragment extends Fragment {
     private MainViewModel sharedViewModel;
 
     private SwipeRefreshLayout swipeRefresh;
+    private LinearLayout layoutFragmentRoot;
     private FrameLayout layoutLoading;
     private LinearLayout layoutError, layoutContent;
     private TextView tvErrorMessage;
@@ -167,8 +174,25 @@ public class CityWeatherFragment extends Fragment {
         swipeRefresh.setOnRefreshListener(viewModel::refresh);
         btnRetry.setOnClickListener(v -> viewModel.refresh());
 
+        applyContentInsetsForOverlay();
         observeViewModels();
         dispatchInitialLoad();
+    }
+
+    /**
+     * The activity hosts the search bar as a floating overlay so the page gradient bleeds
+     * edge-to-edge. Pad the scrollable content by the status-bar inset + the overlay height
+     * so the offline banner / weather card aren't hidden underneath it.
+     */
+    private void applyContentInsetsForOverlay() {
+        int topBarPx = (int) (TOP_BAR_OVERLAY_DP
+                * getResources().getDisplayMetrics().density);
+        ViewCompat.setOnApplyWindowInsetsListener(layoutFragmentRoot, (v, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(v.getPaddingLeft(), bars.top + topBarPx,
+                    v.getPaddingRight(), bars.bottom);
+            return insets;
+        });
     }
 
     @Override
@@ -179,6 +203,7 @@ public class CityWeatherFragment extends Fragment {
 
     private void bindViews(@NonNull View root) {
         swipeRefresh = root.findViewById(R.id.swipeRefresh);
+        layoutFragmentRoot = root.findViewById(R.id.layoutFragmentRoot);
         layoutLoading = root.findViewById(R.id.layoutLoading);
         layoutError = root.findViewById(R.id.layoutError);
         layoutContent = root.findViewById(R.id.layoutContent);
