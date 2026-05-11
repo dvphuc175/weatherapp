@@ -59,4 +59,24 @@
     <string name="notification_channel_name">Cảnh báo thời tiết</string>
     <string name="notification_bad_weather_title">Cảnh báo thời tiết xấu!</string>
     <string name="notification_bad_weather_body">Sắp tới có %1$s. Hãy chú ý an toàn!</string>
+
+    <!-- Recent searches -->
+    <string name="recent_searches_title">Tìm gần đây</string>
+    <string name="recent_search_delete_content_description">Xoá %1$s khỏi tìm gần đây</string>
+
+    <!-- Settings -->
+    <string name="settings_action">Cài đặt</string>
+    <string name="settings_title">Cài đặt</string>
+    <string name="settings_unit_label">Đơn vị nhiệt độ</string>
+    <string name="settings_unit_celsius">°C</string>
+    <string name="settings_unit_fahrenheit">°F</string>
+    <string name="settings_clear_recent">Xoá tìm gần đây</string>
+    <string name="settings_recent_cleared">Đã xoá tìm gần đây</string>
+    <string name="settings_language_hint">Ngôn ngữ theo ngôn ngữ hệ thống. Đổi tại Cài đặt thiết bị → Ngôn ngữ.</string>
+
+    <!-- Offline / cached banner -->
+    <string name="offline_banner_just_now">Đang offline · Cập nhật vừa xong</string>
+    <string name="offline_banner_minutes">Đang offline · Cập nhật %1$d phút trước</string>
+    <string name="offline_banner_hours">Đang offline · Cập nhật %1$d giờ trước</string>
+    <string name="offline_banner_days">Đang offline · Cập nhật %1$d ngày trước</string>
 </resources>

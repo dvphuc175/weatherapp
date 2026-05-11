@@ -8,6 +8,7 @@ import com.example.weather_application.models.ForecastResponse;
 import com.example.weather_application.models.WeatherResponse;
 import com.example.weather_application.network.RetrofitClient;
 import com.example.weather_application.network.WeatherApiService;
+import com.example.weather_application.util.TemperatureUnit;
 
 import java.io.IOException;
 
@@ -18,10 +19,12 @@ import retrofit2.Response;
 /**
  * Bao bọc {@link WeatherApiService} để các tầng UI/ViewModel không phải biết về Retrofit.
  * Trả về {@link Cancellable} để caller có thể huỷ request khi lifecycle kết thúc.
+ *
+ * <p>Each call now takes a {@link TemperatureUnit} so OWM returns °C/°F directly — no
+ * client-side conversion. Caching is the caller's responsibility (see {@code MainViewModel}).
  */
 public final class WeatherRepository {
 
-    private static final String UNITS = "metric";
     private static final String LANG = "vi";
 
     public interface ResultCallback<T> {
@@ -50,23 +53,27 @@ public final class WeatherRepository {
     }
 
     public Cancellable getCurrentWeatherByCoord(double lat, double lon,
+                                                @NonNull TemperatureUnit unit,
                                                 @NonNull ResultCallback<WeatherResponse> cb) {
-        return enqueue(api.getCurrentWeather(lat, lon, apiKey, UNITS, LANG), cb);
+        return enqueue(api.getCurrentWeather(lat, lon, apiKey, unit.owmUnitsParam, LANG), cb);
     }
 
     public Cancellable getCurrentWeatherByCity(@NonNull String city,
+                                               @NonNull TemperatureUnit unit,
                                                @NonNull ResultCallback<WeatherResponse> cb) {
-        return enqueue(api.getWeatherByCity(city, apiKey, UNITS, LANG), cb);
+        return enqueue(api.getWeatherByCity(city, apiKey, unit.owmUnitsParam, LANG), cb);
     }
 
     public Cancellable getForecastByCoord(double lat, double lon,
+                                          @NonNull TemperatureUnit unit,
                                           @NonNull ResultCallback<ForecastResponse> cb) {
-        return enqueue(api.getForecast(lat, lon, apiKey, UNITS, LANG), cb);
+        return enqueue(api.getForecast(lat, lon, apiKey, unit.owmUnitsParam, LANG), cb);
     }
 
     public Cancellable getForecastByCity(@NonNull String city,
+                                         @NonNull TemperatureUnit unit,
                                          @NonNull ResultCallback<ForecastResponse> cb) {
-        return enqueue(api.getForecastByCity(city, apiKey, UNITS, LANG), cb);
+        return enqueue(api.getForecastByCity(city, apiKey, unit.owmUnitsParam, LANG), cb);
     }
 
     /**
@@ -74,9 +81,11 @@ public final class WeatherRepository {
      * fails or the body is missing — caller decides whether to retry.
      */
     @Nullable
-    public WeatherResponse executeCurrentWeatherByCoord(double lat, double lon) throws IOException {
+    public WeatherResponse executeCurrentWeatherByCoord(double lat, double lon,
+                                                        @NonNull TemperatureUnit unit)
+            throws IOException {
         Response<WeatherResponse> response = api
-                .getCurrentWeather(lat, lon, apiKey, UNITS, LANG)
+                .getCurrentWeather(lat, lon, apiKey, unit.owmUnitsParam, LANG)
                 .execute();
         if (!response.isSuccessful()) {
             return null;
