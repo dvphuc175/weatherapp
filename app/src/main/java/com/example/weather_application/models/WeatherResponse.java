@@ -4,6 +4,9 @@ import com.google.gson.annotations.SerializedName;
 import java.util.List;
 
 public class WeatherResponse {
+    @SerializedName("coord")
+    private Coord coord;
+
     @SerializedName("main")
     private CurrentWeather main;
 
@@ -27,6 +30,7 @@ public class WeatherResponse {
     @SerializedName("timezone")
     private int timezone;
 
+    public Coord getCoord() { return coord; }
     public CurrentWeather getMain() { return main; }
     public List<WeatherDescription> getWeather() { return weather; }
     public String getName() { return name; }
