@@ -147,7 +147,7 @@ public class SettingsBottomSheet extends BottomSheetDialogFragment {
                 .setInputData(inputData)
                 .build();
         WorkManager.getInstance(requireContext()).enqueueUniquePeriodicWork(
-                WeatherAlertWorker.UNIQUE_WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request);
+                WeatherAlertWorker.UNIQUE_WORK_NAME, ExistingPeriodicWorkPolicy.REPLACE, request);
     }
 
     @Override

@@ -8,13 +8,13 @@ import androidx.room.Room;
 import androidx.room.RoomDatabase;
 
 /**
- * Application-scoped Room database. Bumped to v3 to key cached snapshots per city/query. The
+ * Application-scoped Room database. Bumped to v5 to key cached snapshots per city/query. The
  * weather blobs are throwaway and the recent_search list is rebuildable from user actions, so
  * {@code fallbackToDestructiveMigration()} is acceptable.
  */
 @Database(
         entities = {RecentSearch.class, CachedSnapshot.class, SavedCity.class},
-        version = 3,
+        version = 5,
         exportSchema = false
 )
 public abstract class AppDatabase extends RoomDatabase {

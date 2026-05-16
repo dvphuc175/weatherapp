@@ -385,7 +385,7 @@ public class MainActivity extends AppCompatActivity {
                 .setInputData(inputData)
                 .build();
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-                WeatherAlertWorker.UNIQUE_WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request);
+                WeatherAlertWorker.UNIQUE_WORK_NAME, ExistingPeriodicWorkPolicy.REPLACE, request);
     }
 
     @Override

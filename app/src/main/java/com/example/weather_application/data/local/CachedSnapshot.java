@@ -10,7 +10,8 @@ import androidx.room.PrimaryKey;
  * One successfully-loaded weather + forecast snapshot, serialized as Gson JSON. Snapshots are
  * keyed by the query identity plus units (for example, {@code city:hanoi:metric} or
  * {@code gps:21.0285,105.8542:metric}) so each pager page can fall back to its own cache instead
- * of being limited to the last city fetched.
+ * of being limited to the last city fetched. AQI is intentionally fetched live and not part of
+ * this Room row so a non-critical widget never blocks the core weather cache.
  */
 @Entity(tableName = "cached_snapshot")
 public class CachedSnapshot {

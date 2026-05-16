@@ -75,9 +75,6 @@ public class CityViewModel extends AndroidViewModel {
     private WeatherResponse latestWeather;
     @Nullable
     private ForecastResponse latestForecast;
-    @Nullable
-    private AirQualityResponse latestAirQuality;
-
     /** Listens for unit changes so the page reloads with the new {@code units=} param. */
     @NonNull
     private final SharedPreferences.OnSharedPreferenceChangeListener unitListener;
@@ -266,16 +263,14 @@ public class CityViewModel extends AndroidViewModel {
             @Override
             public void onSuccess(@NonNull AirQualityResponse data) {
                 if (isStale(gen)) return;
-                latestAirQuality = data;
                 airQuality.postValue(AirQualityUiState.success(data));
-                persistSnapshotIfReady();
             }
 
             @Override
             public void onError(@Nullable String message) {
                 if (isStale(gen)) return;
                 // Air quality is additive. Keep the weather page usable even when this endpoint
-                // fails; cached weather can still provide a previous AQI snapshot if present.
+                // fails; the AQI card will show an unavailable state.
                 airQuality.postValue(AirQualityUiState.error(message == null ? "" : message));
             }
         };
@@ -340,11 +335,7 @@ public class CityViewModel extends AndroidViewModel {
                 List<ForecastItem> items = f.getList();
                 forecast.postValue(ForecastUiState.success(
                         items == null ? Collections.<ForecastItem>emptyList() : items));
-                if (aq != null) {
-                    airQuality.postValue(AirQualityUiState.success(aq));
-                } else {
-                    airQuality.postValue(AirQualityUiState.error(""));
-                }
+                airQuality.postValue(AirQualityUiState.error(""));
             } catch (Exception parseError) {
                 weather.postValue(WeatherUiState.error(errorMessage == null ? "" : errorMessage));
             }
