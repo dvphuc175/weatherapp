@@ -194,7 +194,7 @@ public class CityViewModel extends AndroidViewModel {
         cancelInFlight();
         latestWeather = null;
         latestForecast = null;
-        latestAirQuality = null;
+        // AQI is intentionally not cached in a backing field; it is a live, non-blocking widget.
         return ++loadGeneration;
     }
 
