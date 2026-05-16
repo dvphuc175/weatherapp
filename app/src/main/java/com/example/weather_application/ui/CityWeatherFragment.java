@@ -268,6 +268,9 @@ public class CityWeatherFragment extends Fragment {
             if (forecastAdapter != null) {
                 forecastAdapter.setTemperatureUnit(unit);
             }
+            if (dailyForecastAdapter != null) {
+                dailyForecastAdapter.setTemperatureUnit(unit);
+            }
         });
 
         // Current-location pages only know their coord once the activity hands it over.
@@ -313,6 +316,9 @@ public class CityWeatherFragment extends Fragment {
         String name = data.getName();
         tvLocation.setText(name == null ? "" : name.toUpperCase(Locale.ROOT));
         lavLocationIcon.setAnimation(state.isCurrentLocation() ? R.raw.anim_location : R.raw.anim_search);
+        lavLocationIcon.setContentDescription(getString(state.isCurrentLocation()
+                ? R.string.current_location_content_description
+                : R.string.saved_city_content_description));
         lavLocationIcon.playAnimation();
 
         CurrentWeather main = data.getMain();
@@ -326,7 +332,10 @@ public class CityWeatherFragment extends Fragment {
         List<WeatherDescription> descriptions = data.getWeather();
         if (descriptions != null && !descriptions.isEmpty()) {
             WeatherDescription first = descriptions.get(0);
-            tvDescription.setText(capitalize(first.getDescription()));
+            String description = capitalize(first.getDescription());
+            tvDescription.setText(description);
+            lavWeatherIcon.setContentDescription(getString(
+                    R.string.weather_icon_content_description, description));
             lavWeatherIcon.setAnimation(WeatherIconMapper.rawForIconCode(first.getIcon()));
             lavWeatherIcon.playAnimation();
             applyDynamicGradient(first.getIcon());
@@ -357,9 +366,10 @@ public class CityWeatherFragment extends Fragment {
         List<DailyForecast> dailyItems = DailyForecastAggregator.aggregate(
                 items, currentCityTimezoneOffsetSec);
         if (dailyForecastAdapter == null) {
-            dailyForecastAdapter = new DailyForecastAdapter(requireContext(), dailyItems);
+            dailyForecastAdapter = new DailyForecastAdapter(requireContext(), dailyItems, currentUnit);
             rvDailyForecast.setAdapter(dailyForecastAdapter);
         } else {
+            dailyForecastAdapter.setTemperatureUnit(currentUnit);
             dailyForecastAdapter.submitList(dailyItems);
         }
     }

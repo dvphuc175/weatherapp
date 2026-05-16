@@ -116,6 +116,7 @@
                             android:layout_width="35dp"
                             android:layout_height="35dp"
                             android:layout_marginEnd="8dp"
+                            android:contentDescription="@string/saved_city_content_description"
                             app:lottie_autoPlay="true"
                             app:lottie_loop="true" />
 
@@ -134,6 +135,7 @@
                         android:layout_width="150dp"
                         android:layout_height="150dp"
                         android:layout_marginTop="5dp"
+                        android:contentDescription="@string/updating"
                         app:lottie_autoPlay="true"
                         app:lottie_loop="true" />
 

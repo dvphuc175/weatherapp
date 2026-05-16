@@ -11,6 +11,8 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.airbnb.lottie.LottieAnimationView;
 import com.example.weather_application.models.DailyForecast;
+import com.example.weather_application.util.TemperatureUnit;
+import com.example.weather_application.util.UnitFormatter;
 import com.example.weather_application.util.WeatherIconMapper;
 
 import java.text.SimpleDateFormat;
@@ -37,17 +39,27 @@ public class DailyForecastAdapter
     private final List<DailyForecast> items;
     private final SimpleDateFormat weekdayFormat;
     private final SimpleDateFormat shortDateFormat;
+    @NonNull
+    private TemperatureUnit temperatureUnit;
     /** Synthetic UTC zone — we feed it dates already shifted into city-local time. */
     private final TimeZone utc;
 
-    public DailyForecastAdapter(@NonNull Context context, @NonNull List<DailyForecast> items) {
+    public DailyForecastAdapter(@NonNull Context context, @NonNull List<DailyForecast> items,
+                                @NonNull TemperatureUnit temperatureUnit) {
         this.context = context;
         this.items = new ArrayList<>(items);
+        this.temperatureUnit = temperatureUnit;
         this.utc = TimeZone.getTimeZone("UTC");
         this.weekdayFormat = new SimpleDateFormat("EEEE", Locale.getDefault());
         this.weekdayFormat.setTimeZone(utc);
         this.shortDateFormat = new SimpleDateFormat("dd/MM", Locale.getDefault());
         this.shortDateFormat.setTimeZone(utc);
+    }
+
+    public void setTemperatureUnit(@NonNull TemperatureUnit unit) {
+        if (this.temperatureUnit == unit) return;
+        this.temperatureUnit = unit;
+        notifyDataSetChanged();
     }
 
     public void submitList(@NonNull List<DailyForecast> next) {
@@ -72,10 +84,8 @@ public class DailyForecastAdapter
         holder.tvDayName.setText(dayLabel(dayMillis));
         holder.tvDate.setText(shortDateFormat.format(new Date(dayMillis)));
 
-        holder.tvTempRange.setText(context.getString(
-                R.string.daily_temp_range_format,
-                Math.round(item.getMinTempCelsius()),
-                Math.round(item.getMaxTempCelsius())));
+        holder.tvTempRange.setText(UnitFormatter.formatTemperatureRange(
+                item.getMinTempCelsius(), item.getMaxTempCelsius(), temperatureUnit));
 
         holder.lavIcon.setAnimation(WeatherIconMapper.rawForIconCode(item.getIconCode()));
         holder.lavIcon.playAnimation();

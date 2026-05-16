@@ -6,6 +6,9 @@
     <string name="search_action">Search</string>
 
     <!-- Header / current weather -->
+    <string name="current_location_content_description">Current location</string>
+    <string name="saved_city_content_description">Saved city</string>
+    <string name="weather_icon_content_description">Weather: %1$s</string>
     <string name="loading_uppercase">LOADING…</string>
     <string name="updating">Updating…</string>
     <string name="placeholder_temperature">--°C</string>
@@ -72,6 +75,10 @@
     <string name="settings_unit_fahrenheit">°F</string>
     <string name="settings_clear_recent">Clear recent searches</string>
     <string name="settings_recent_cleared">Recent searches cleared</string>
+    <string name="settings_weather_alerts_label">Bad weather alerts</string>
+    <string name="settings_weather_alerts_summary">Receive notifications when your current location has rain or thunderstorms.</string>
+    <string name="settings_weather_alerts_enabled">Weather alerts enabled</string>
+    <string name="settings_weather_alerts_disabled">Weather alerts disabled</string>
     <string name="settings_language_hint">Language follows the system. Change it in device Settings → Language.</string>
 
     <!-- Offline / cached banner -->
