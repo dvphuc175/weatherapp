@@ -16,6 +16,7 @@ public final class UserPreferences {
 
     private static final String PREFS_NAME = "user_prefs";
     private static final String KEY_TEMPERATURE_UNIT = "temperature_unit";
+    private static final String KEY_WEATHER_ALERTS_ENABLED = "weather_alerts_enabled";
 
     private static volatile UserPreferences INSTANCE;
 
@@ -51,6 +52,14 @@ public final class UserPreferences {
         prefs.edit().putString(KEY_TEMPERATURE_UNIT, unit.key).apply();
     }
 
+    public boolean isWeatherAlertsEnabled() {
+        return prefs.getBoolean(KEY_WEATHER_ALERTS_ENABLED, false);
+    }
+
+    public void setWeatherAlertsEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_WEATHER_ALERTS_ENABLED, enabled).apply();
+    }
+
     public void registerListener(@NonNull SharedPreferences.OnSharedPreferenceChangeListener listener) {
         prefs.registerOnSharedPreferenceChangeListener(listener);
     }
@@ -61,5 +70,9 @@ public final class UserPreferences {
 
     public static String keyTemperatureUnit() {
         return KEY_TEMPERATURE_UNIT;
+    }
+
+    public static String keyWeatherAlertsEnabled() {
+        return KEY_WEATHER_ALERTS_ENABLED;
     }
 }

@@ -3,7 +3,6 @@ package com.example.weather_application;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
@@ -30,12 +29,16 @@ import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
 
+import com.example.weather_application.data.UserPreferences;
+import com.example.weather_application.data.WeatherRepository;
 import com.example.weather_application.data.local.RecentSearch;
 import com.example.weather_application.data.local.SavedCity;
+import com.example.weather_application.models.WeatherResponse;
 import com.example.weather_application.ui.CityPagerAdapter;
 import com.example.weather_application.ui.CityPagerAdapter.PagerItem;
 import com.example.weather_application.ui.MainViewModel;
 import com.example.weather_application.ui.SettingsBottomSheet;
+import com.example.weather_application.util.TemperatureUnit;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.Priority;
@@ -58,9 +61,7 @@ import java.util.concurrent.TimeUnit;
 public class MainActivity extends AppCompatActivity {
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 100;
-    private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 101;
     private static final long WORKER_INTERVAL_MINUTES = 15L;
-    private static final String WORKER_UNIQUE_NAME = "WeatherAlertWork";
 
     private EditText etSearchCity;
     private ImageView ivSearch, ivSettings;
@@ -76,6 +77,8 @@ public class MainActivity extends AppCompatActivity {
 
     private MainViewModel viewModel;
     private FusedLocationProviderClient fusedLocationClient;
+    private WeatherRepository weatherRepository;
+    private UserPreferences userPreferences;
 
     /** {@code true} once we've granted GPS permission and asked for a fix; controls whether
      *  the pager includes a current-location page slot. */
@@ -86,6 +89,8 @@ public class MainActivity extends AppCompatActivity {
     /** Latest snapshot of the recent-search list; consulted when the search field focuses. */
     @androidx.annotation.Nullable
     private List<RecentSearch> lastRecentSearches;
+    @androidx.annotation.Nullable
+    private WeatherRepository.Cancellable cityValidationRequest;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -98,6 +103,8 @@ public class MainActivity extends AppCompatActivity {
 
         viewModel = new ViewModelProvider(this).get(MainViewModel.class);
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+        weatherRepository = new WeatherRepository();
+        userPreferences = UserPreferences.get(this);
 
         pagerAdapter = new CityPagerAdapter(this);
         viewPagerCities.setAdapter(pagerAdapter);
@@ -113,14 +120,6 @@ public class MainActivity extends AppCompatActivity {
             v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
             new SettingsBottomSheet().show(getSupportFragmentManager(), SettingsBottomSheet.TAG);
         });
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                && ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
-                    NOTIFICATION_PERMISSION_REQUEST_CODE);
-        }
 
         requestLocationIfNeeded();
     }
@@ -228,8 +227,9 @@ public class MainActivity extends AppCompatActivity {
                 R.string.recent_search_delete_content_description, entry.cityName));
         chip.setOnClickListener(v -> {
             etSearchCity.setText(entry.cityName);
-            jumpToOrPinCity(entry.cityName);
             hideKeyboard(v);
+            etSearchCity.clearFocus();
+            validateThenPinCity(entry.cityName, false);
         });
         chip.setOnCloseIconClickListener(v -> viewModel.removeRecentSearch(entry.cityName));
         return chip;
@@ -255,8 +255,7 @@ public class MainActivity extends AppCompatActivity {
         // Drop focus so the chips collapse — the search has been issued, no need to keep them
         // showing.
         etSearchCity.clearFocus();
-        viewModel.recordRecentSearch(cityName);
-        jumpToOrPinCity(cityName);
+        validateThenPinCity(cityName, true);
     }
 
     private void hideKeyboard(View v) {
@@ -267,11 +266,57 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * If the city is already pinned: just swipe to its page. Otherwise: pin it and the
-     * {@code savedCities} observer will rebuild the pager + swipe via
-     * {@link #pendingSwipeAfterAdd}.
+     * Validate unknown city names before mutating saved/recent lists. If the page already exists we
+     * can jump immediately; otherwise one lightweight current-weather request confirms the city and
+     * provides the canonical display name used for the pinned page.
      */
-    private void jumpToOrPinCity(@NonNull String cityName) {
+    private void validateThenPinCity(@NonNull String cityName, boolean recordRecentWhenValid) {
+        int idx = pagerAdapter.indexOfCity(cityName);
+        if (idx >= 0) {
+            viewPagerCities.setCurrentItem(idx, true);
+            if (recordRecentWhenValid) {
+                viewModel.recordRecentSearch(cityName);
+            }
+            return;
+        }
+        if (!weatherRepository.hasApiKey()) {
+            Toast.makeText(this, R.string.error_default_message, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (cityValidationRequest != null) {
+            cityValidationRequest.cancel();
+        }
+        TemperatureUnit unit = userPreferences.getTemperatureUnit();
+        cityValidationRequest = weatherRepository.getCurrentWeatherByCity(cityName, unit,
+                new WeatherRepository.ResultCallback<WeatherResponse>() {
+                    @Override
+                    public void onSuccess(@NonNull WeatherResponse data) {
+                        cityValidationRequest = null;
+                        String canonicalName = data.getName();
+                        String pageCity = canonicalName == null || canonicalName.trim().isEmpty()
+                                ? cityName
+                                : canonicalName.trim();
+                        if (recordRecentWhenValid) {
+                            viewModel.recordRecentSearch(pageCity);
+                        }
+                        pinValidatedCity(pageCity);
+                    }
+
+                    @Override
+                    public void onError(@androidx.annotation.Nullable String message) {
+                        cityValidationRequest = null;
+                        Toast.makeText(MainActivity.this,
+                                R.string.toast_city_not_found,
+                                Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
+    /**
+     * Pin a city that has already been validated by the API; savedCities observer rebuilds the
+     * pager and consumes {@link #pendingSwipeAfterAdd}.
+     */
+    private void pinValidatedCity(@NonNull String cityName) {
         int idx = pagerAdapter.indexOfCity(cityName);
         if (idx >= 0) {
             viewPagerCities.setCurrentItem(idx, true);
@@ -323,7 +368,9 @@ public class MainActivity extends AppCompatActivity {
                     }
                     double lat = location.getLatitude();
                     double lon = location.getLongitude();
-                    scheduleWeatherAlertWorker(lat, lon);
+                    if (userPreferences.isWeatherAlertsEnabled()) {
+                        scheduleWeatherAlertWorker(lat, lon);
+                    }
                     viewModel.setCurrentLocation(lat, lon);
                 });
     }
@@ -338,7 +385,7 @@ public class MainActivity extends AppCompatActivity {
                 .setInputData(inputData)
                 .build();
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-                WORKER_UNIQUE_NAME, ExistingPeriodicWorkPolicy.KEEP, request);
+                WeatherAlertWorker.UNIQUE_WORK_NAME, ExistingPeriodicWorkPolicy.REPLACE, request);
     }
 
     @Override
@@ -353,17 +400,16 @@ public class MainActivity extends AppCompatActivity {
             } else {
                 Toast.makeText(this, R.string.toast_location_permission_required, Toast.LENGTH_SHORT).show();
             }
-        } else if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
-            if (grantResults.length == 0 || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this, R.string.toast_notification_permission_denied,
-                        Toast.LENGTH_SHORT).show();
-            }
         }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (cityValidationRequest != null) {
+            cityValidationRequest.cancel();
+            cityValidationRequest = null;
+        }
         if (dotsMediator != null) {
             dotsMediator.detach();
             dotsMediator = null;

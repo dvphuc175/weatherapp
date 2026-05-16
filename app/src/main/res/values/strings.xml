@@ -6,6 +6,9 @@
     <string name="search_action">Tìm kiếm</string>
 
     <!-- Header / current weather -->
+    <string name="current_location_content_description">Vị trí hiện tại</string>
+    <string name="saved_city_content_description">Thành phố đã lưu</string>
+    <string name="weather_icon_content_description">Thời tiết: %1$s</string>
     <string name="loading_uppercase">ĐANG TẢI…</string>
     <string name="updating">Đang cập nhật…</string>
     <string name="placeholder_temperature">--°C</string>
@@ -31,6 +34,24 @@
     <string name="visibility_value_km_format">%1$d km</string>
     <string name="visibility_value_km_decimal_format">%1$.1f km</string>
     <string name="pop_value_format">💧 %1$d%%</string>
+
+    <!-- Chất lượng không khí -->
+    <string name="air_quality_label">Chất lượng không khí</string>
+    <string name="air_quality_value_format">AQI %1$d</string>
+    <string name="air_quality_pm25_label">PM2.5</string>
+    <string name="air_quality_pm10_label">PM10</string>
+    <string name="air_quality_particle_format">%1$.1f µg/m³</string>
+    <string name="air_quality_unavailable">Chưa có dữ liệu chất lượng không khí.</string>
+    <string name="air_quality_good">Tốt</string>
+    <string name="air_quality_fair">Khá</string>
+    <string name="air_quality_moderate">Trung bình</string>
+    <string name="air_quality_poor">Kém</string>
+    <string name="air_quality_very_poor">Rất kém</string>
+    <string name="air_quality_advice_good">Không khí tốt, phù hợp hoạt động ngoài trời.</string>
+    <string name="air_quality_advice_fair">Không khí khá ổn; người nhạy cảm nên theo dõi thêm.</string>
+    <string name="air_quality_advice_moderate">Nên hạn chế vận động mạnh ngoài trời nếu bạn nhạy cảm.</string>
+    <string name="air_quality_advice_poor">Nên giảm thời gian ngoài trời và cân nhắc đeo khẩu trang.</string>
+    <string name="air_quality_advice_very_poor">Hạn chế ra ngoài; ưu tiên ở trong nhà nếu có thể.</string>
 
     <!-- Trạng thái loading / lỗi -->
     <string name="error_default_message">Không tải được thời tiết. Vui lòng thử lại.</string>
@@ -72,6 +93,10 @@
     <string name="settings_unit_fahrenheit">°F</string>
     <string name="settings_clear_recent">Xoá tìm gần đây</string>
     <string name="settings_recent_cleared">Đã xoá tìm gần đây</string>
+    <string name="settings_weather_alerts_label">Cảnh báo thời tiết xấu</string>
+    <string name="settings_weather_alerts_summary">Nhận thông báo khi vị trí hiện tại có mưa hoặc dông.</string>
+    <string name="settings_weather_alerts_enabled">Đã bật cảnh báo thời tiết</string>
+    <string name="settings_weather_alerts_disabled">Đã tắt cảnh báo thời tiết</string>
     <string name="settings_language_hint">Ngôn ngữ theo ngôn ngữ hệ thống. Đổi tại Cài đặt thiết bị → Ngôn ngữ.</string>
 
     <!-- Offline / cached banner -->

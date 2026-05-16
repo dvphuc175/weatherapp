@@ -11,7 +11,6 @@ import androidx.lifecycle.MutableLiveData;
 
 import com.example.weather_application.data.UserPreferences;
 import com.example.weather_application.data.local.AppDatabase;
-import com.example.weather_application.data.local.CachedSnapshotDao;
 import com.example.weather_application.data.local.RecentSearch;
 import com.example.weather_application.data.local.RecentSearchDao;
 import com.example.weather_application.data.local.SavedCity;
@@ -27,15 +26,14 @@ import java.util.concurrent.Executors;
  * temperature unit, the recent-search list, and the current GPS coord. Per-page weather state
  * lives in {@link CityViewModel}.
  *
- * <p>The unit-pref listener is the central place that wipes the offline cache when the user
- * flips °C/°F — individual {@link CityViewModel} instances just react to the change by reloading.
+ * <p>The unit-pref listener broadcasts °C/°F changes; individual {@link CityViewModel}
+ * instances react by reloading with the matching API units/cache key.
  */
 public class MainViewModel extends AndroidViewModel {
 
     private final UserPreferences userPreferences;
     private final RecentSearchDao recentSearchDao;
     private final SavedCityDao savedCityDao;
-    private final CachedSnapshotDao cachedSnapshotDao;
     private final ExecutorService diskIo = Executors.newSingleThreadExecutor();
 
     private final MutableLiveData<TemperatureUnit> temperatureUnit = new MutableLiveData<>();
@@ -52,7 +50,6 @@ public class MainViewModel extends AndroidViewModel {
         this.userPreferences = UserPreferences.get(application);
         this.recentSearchDao = db.recentSearchDao();
         this.savedCityDao = db.savedCityDao();
-        this.cachedSnapshotDao = db.cachedSnapshotDao();
         this.recentSearches = recentSearchDao.observeRecent(RecentSearchDao.MAX_ENTRIES);
         this.savedCities = savedCityDao.observeOrdered();
         this.temperatureUnit.setValue(userPreferences.getTemperatureUnit());
@@ -60,9 +57,8 @@ public class MainViewModel extends AndroidViewModel {
             if (UserPreferences.keyTemperatureUnit().equals(key)) {
                 TemperatureUnit next = this.userPreferences.getTemperatureUnit();
                 temperatureUnit.postValue(next);
-                // Cache is keyed on the old units= param. Wipe it so each page falls through
-                // to a fresh fetch with the new unit.
-                diskIo.execute(cachedSnapshotDao::deleteAll);
+                // Offline snapshots are keyed per unit, so each page can either use a matching
+                // cached blob or fall through to a fresh fetch with the new unit.
             }
         };
         userPreferences.registerListener(unitListener);
