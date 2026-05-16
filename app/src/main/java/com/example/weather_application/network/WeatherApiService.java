@@ -1,4 +1,5 @@
 package com.example.weather_application.network;
+import com.example.weather_application.models.AirQualityResponse;
 import com.example.weather_application.models.ForecastResponse;
 import com.example.weather_application.models.WeatherResponse;
 import retrofit2.Call;
@@ -38,5 +39,12 @@ public interface WeatherApiService {
             @Query("appid") String apiKey,
             @Query("units") String units,
             @Query("lang") String lang
+    );
+
+    @GET("data/2.5/air_pollution")
+    Call<AirQualityResponse> getAirQuality(
+            @Query("lat") double lat,
+            @Query("lon") double lon,
+            @Query("appid") String apiKey
     );
 }

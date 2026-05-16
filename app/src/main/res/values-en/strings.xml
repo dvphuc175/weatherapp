@@ -35,6 +35,24 @@
     <string name="visibility_value_km_decimal_format">%1$.1f km</string>
     <string name="pop_value_format">💧 %1$d%%</string>
 
+    <!-- Air quality -->
+    <string name="air_quality_label">Air quality</string>
+    <string name="air_quality_value_format">AQI %1$d</string>
+    <string name="air_quality_pm25_label">PM2.5</string>
+    <string name="air_quality_pm10_label">PM10</string>
+    <string name="air_quality_particle_format">%1$.1f µg/m³</string>
+    <string name="air_quality_unavailable">Air quality data is unavailable.</string>
+    <string name="air_quality_good">Good</string>
+    <string name="air_quality_fair">Fair</string>
+    <string name="air_quality_moderate">Moderate</string>
+    <string name="air_quality_poor">Poor</string>
+    <string name="air_quality_very_poor">Very poor</string>
+    <string name="air_quality_advice_good">Air is clean and suitable for outdoor activities.</string>
+    <string name="air_quality_advice_fair">Air is acceptable; sensitive people may want to keep an eye on it.</string>
+    <string name="air_quality_advice_moderate">Limit heavy outdoor activity if you are sensitive to air pollution.</string>
+    <string name="air_quality_advice_poor">Reduce outdoor time and consider wearing a mask.</string>
+    <string name="air_quality_advice_very_poor">Avoid going outside when possible and stay indoors.</string>
+
     <!-- Loading / error states -->
     <string name="error_default_message">Could not load weather. Please try again.</string>
     <string name="retry_button">Retry</string>
