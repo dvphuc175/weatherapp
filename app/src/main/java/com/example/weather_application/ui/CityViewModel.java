@@ -285,12 +285,14 @@ public class CityViewModel extends AndroidViewModel {
         if (query == null) return;
         final String cacheKey = query.cacheKey(unit);
         final String cityName = w.getName();
+        final AirQualityResponse aq = latestAirQuality;
         diskIo.execute(() -> cachedSnapshotDao.upsert(new CachedSnapshot(
                 cacheKey,
                 cityName,
                 unit.owmUnitsParam,
                 gson.toJson(w),
                 gson.toJson(f),
+                aq == null ? null : gson.toJson(aq),
                 System.currentTimeMillis())));
     }
 
@@ -317,12 +319,16 @@ public class CityViewModel extends AndroidViewModel {
             try {
                 WeatherResponse w = gson.fromJson(snap.weatherJson, WeatherResponse.class);
                 ForecastResponse f = gson.fromJson(snap.forecastJson, ForecastResponse.class);
+                AirQualityResponse aq = snap.airQualityJson == null
+                        ? null
+                        : gson.fromJson(snap.airQualityJson, AirQualityResponse.class);
                 if (w == null || f == null) {
                     weather.postValue(WeatherUiState.error(errorMessage == null ? "" : errorMessage));
                     return;
                 }
                 latestWeather = w;
                 latestForecast = f;
+                latestAirQuality = aq;
                 servingFromCache.postValue(true);
                 cacheSavedAt.postValue(snap.savedAt);
                 weather.postValue(WeatherUiState.success(w, isCurrentLocation));
