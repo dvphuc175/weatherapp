@@ -41,17 +41,23 @@ public class CachedSnapshot {
     @ColumnInfo(name = "forecast_json")
     public String forecastJson;
 
+    /** Gson-serialized {@link com.example.weather_application.models.AirQualityResponse}. */
+    @Nullable
+    @ColumnInfo(name = "air_quality_json")
+    public String airQualityJson;
+
     @ColumnInfo(name = "saved_at")
     public long savedAt;
 
     public CachedSnapshot(@NonNull String id, @Nullable String cityName, @NonNull String units,
                           @Nullable String weatherJson, @Nullable String forecastJson,
-                          long savedAt) {
+                          @Nullable String airQualityJson, long savedAt) {
         this.id = id;
         this.cityName = cityName;
         this.units = units;
         this.weatherJson = weatherJson;
         this.forecastJson = forecastJson;
+        this.airQualityJson = airQualityJson;
         this.savedAt = savedAt;
     }
 }
