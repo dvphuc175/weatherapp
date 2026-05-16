@@ -4,6 +4,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.example.weather_application.BuildConfig;
+import com.example.weather_application.models.AirQualityResponse;
 import com.example.weather_application.models.ForecastResponse;
 import com.example.weather_application.models.WeatherResponse;
 import com.example.weather_application.network.RetrofitClient;
@@ -74,6 +75,11 @@ public final class WeatherRepository {
                                          @NonNull TemperatureUnit unit,
                                          @NonNull ResultCallback<ForecastResponse> cb) {
         return enqueue(api.getForecastByCity(city, apiKey, unit.owmUnitsParam, LANG), cb);
+    }
+
+    public Cancellable getAirQuality(double lat, double lon,
+                                     @NonNull ResultCallback<AirQualityResponse> cb) {
+        return enqueue(api.getAirQuality(lat, lon, apiKey), cb);
     }
 
     /**

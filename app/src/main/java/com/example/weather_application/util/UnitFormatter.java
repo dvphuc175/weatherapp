@@ -28,11 +28,13 @@ public final class UnitFormatter {
                 speed, unit.windSuffix);
     }
 
-    /** {@code "22° / 30°"} — used by the daily row where we already render both ends. */
+    /** {@code "22°C / 30°C"} / {@code "72°F / 86°F"}. */
     @NonNull
-    public static String formatTemperatureRange(double min, double max) {
-        return String.format(Locale.getDefault(), "%d° / %d°",
-                Math.round(min), Math.round(max));
+    public static String formatTemperatureRange(double min, double max,
+                                                @NonNull TemperatureUnit unit) {
+        return String.format(Locale.getDefault(), "%d%s / %d%s",
+                Math.round(min), unit.temperatureSuffix,
+                Math.round(max), unit.temperatureSuffix);
     }
 
     /** {@code "--°C"} placeholder while loading. */

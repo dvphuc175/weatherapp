@@ -89,25 +89,28 @@
 
             <ImageView
                 android:id="@+id/ivSearch"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_marginStart="12dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="6dp"
+                android:padding="12dp"
                 android:src="@android:drawable/ic_menu_search"
                 android:contentDescription="@string/search_action"
                 android:clickable="true"
                 android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
                 app:tint="@color/icon_on_brand" />
 
             <ImageView
                 android:id="@+id/ivSettings"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_marginStart="12dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="2dp"
+                android:padding="12dp"
                 android:src="@android:drawable/ic_menu_preferences"
                 android:contentDescription="@string/settings_action"
-                android:padding="0dp"
                 android:clickable="true"
                 android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
                 app:tint="@color/icon_on_brand" />
         </LinearLayout>
 

@@ -20,6 +20,8 @@ import java.util.List;
 
 public class WeatherAlertWorker extends Worker {
 
+    public static final String UNIQUE_WORK_NAME = "WeatherAlertWork";
+
     private static final String CHANNEL_ID = "weather_alert_channel";
     private static final int NOTIFICATION_ID = 1;
 

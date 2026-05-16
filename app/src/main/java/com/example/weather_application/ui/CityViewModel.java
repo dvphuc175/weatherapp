@@ -20,6 +20,8 @@ import com.example.weather_application.data.WeatherRepository.ResultCallback;
 import com.example.weather_application.data.local.AppDatabase;
 import com.example.weather_application.data.local.CachedSnapshot;
 import com.example.weather_application.data.local.CachedSnapshotDao;
+import com.example.weather_application.models.AirQualityResponse;
+import com.example.weather_application.models.Coord;
 import com.example.weather_application.models.ForecastItem;
 import com.example.weather_application.models.ForecastResponse;
 import com.example.weather_application.models.WeatherResponse;
@@ -29,6 +31,7 @@ import com.google.gson.Gson;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -58,6 +61,7 @@ public class CityViewModel extends AndroidViewModel {
 
     private final MutableLiveData<WeatherUiState> weather = new MutableLiveData<>();
     private final MutableLiveData<ForecastUiState> forecast = new MutableLiveData<>();
+    private final MutableLiveData<AirQualityUiState> airQuality = new MutableLiveData<>();
     private final MutableLiveData<Boolean> servingFromCache = new MutableLiveData<>(false);
     private final MutableLiveData<Long> cacheSavedAt = new MutableLiveData<>(null);
 
@@ -71,6 +75,10 @@ public class CityViewModel extends AndroidViewModel {
     private WeatherResponse latestWeather;
     @Nullable
     private ForecastResponse latestForecast;
+    /** Last AQI payload for the active generation. Kept as a field so AQI callbacks and any
+     *  future cache integration have a stable owner; it is intentionally not persisted to Room. */
+    @Nullable
+    private AirQualityResponse latestAirQuality;
 
     /** Listens for unit changes so the page reloads with the new {@code units=} param. */
     @NonNull
@@ -90,7 +98,8 @@ public class CityViewModel extends AndroidViewModel {
         this.boundIsCurrentLocation = cur != null && cur;
         this.unitListener = (sp, key) -> {
             if (UserPreferences.keyTemperatureUnit().equals(key)) {
-                // Cache is keyed on the old units param; the shared MainViewModel wipes it.
+                // Reload with the new units= param. Snapshots are keyed per unit, so a matching
+                // offline cache can still be used when the network is unavailable.
                 refresh();
             }
         };
@@ -105,6 +114,11 @@ public class CityViewModel extends AndroidViewModel {
     @NonNull
     public LiveData<ForecastUiState> getForecast() {
         return forecast;
+    }
+
+    @NonNull
+    public LiveData<AirQualityUiState> getAirQuality() {
+        return airQuality;
     }
 
     @NonNull
@@ -134,6 +148,7 @@ public class CityViewModel extends AndroidViewModel {
         TemperatureUnit unit = currentUnit();
         weather.postValue(WeatherUiState.loading());
         forecast.postValue(ForecastUiState.loading());
+        airQuality.postValue(AirQualityUiState.loading());
         track(repository.getCurrentWeatherByCity(city, unit, weatherCallback(false, gen)));
         track(repository.getForecastByCity(city, unit, forecastCallback(gen)));
     }
@@ -145,8 +160,10 @@ public class CityViewModel extends AndroidViewModel {
         TemperatureUnit unit = currentUnit();
         weather.postValue(WeatherUiState.loading());
         forecast.postValue(ForecastUiState.loading());
+        airQuality.postValue(AirQualityUiState.loading());
         track(repository.getCurrentWeatherByCoord(lat, lon, unit, weatherCallback(true, gen)));
         track(repository.getForecastByCoord(lat, lon, unit, forecastCallback(gen)));
+        track(repository.getAirQuality(lat, lon, airQualityCallback(gen)));
     }
 
     /** Re-issue the last query. Pull-to-refresh, retry button, and network-regained all call this. */
@@ -182,6 +199,7 @@ public class CityViewModel extends AndroidViewModel {
         cancelInFlight();
         latestWeather = null;
         latestForecast = null;
+        latestAirQuality = null;
         return ++loadGeneration;
     }
 
@@ -199,6 +217,9 @@ public class CityViewModel extends AndroidViewModel {
                 cacheSavedAt.postValue(null);
                 latestWeather = data;
                 weather.postValue(WeatherUiState.success(data, isCurrentLocation));
+                if (!isCurrentLocation) {
+                    loadAirQualityForWeather(data, gen);
+                }
                 persistSnapshotIfReady();
             }
 
@@ -208,6 +229,15 @@ public class CityViewModel extends AndroidViewModel {
                 tryServeFromCache(message, isCurrentLocation);
             }
         };
+    }
+
+    private void loadAirQualityForWeather(@NonNull WeatherResponse data, final int gen) {
+        Coord coord = data.getCoord();
+        if (coord == null) {
+            airQuality.postValue(AirQualityUiState.error(""));
+            return;
+        }
+        track(repository.getAirQuality(coord.getLat(), coord.getLon(), airQualityCallback(gen)));
     }
 
     private ResultCallback<ForecastResponse> forecastCallback(final int gen) {
@@ -233,14 +263,36 @@ public class CityViewModel extends AndroidViewModel {
         };
     }
 
+    private ResultCallback<AirQualityResponse> airQualityCallback(final int gen) {
+        return new ResultCallback<AirQualityResponse>() {
+            @Override
+            public void onSuccess(@NonNull AirQualityResponse data) {
+                if (isStale(gen)) return;
+                latestAirQuality = data;
+                airQuality.postValue(AirQualityUiState.success(data));
+            }
+
+            @Override
+            public void onError(@Nullable String message) {
+                if (isStale(gen)) return;
+                // Air quality is additive. Keep the weather page usable even when this endpoint
+                // fails; the AQI card will show an unavailable state.
+                airQuality.postValue(AirQualityUiState.error(message == null ? "" : message));
+            }
+        };
+    }
+
     private void persistSnapshotIfReady() {
         final WeatherResponse w = latestWeather;
         final ForecastResponse f = latestForecast;
         if (w == null || f == null) return;
         final TemperatureUnit unit = currentUnit();
+        final LastQuery query = lastQuery;
+        if (query == null) return;
+        final String cacheKey = query.cacheKey(unit);
         final String cityName = w.getName();
         diskIo.execute(() -> cachedSnapshotDao.upsert(new CachedSnapshot(
-                CachedSnapshot.SINGLE_ROW_KEY,
+                cacheKey,
                 cityName,
                 unit.owmUnitsParam,
                 gson.toJson(w),
@@ -249,28 +301,22 @@ public class CityViewModel extends AndroidViewModel {
     }
 
     /**
-     * Fall back to the single-row cache if the units match AND the cached city name matches
-     * this page's bound city. We don't want page A to render with page B's cached blob just
-     * because B was the last city fetched before going offline.
+     * Fall back to the snapshot for this exact query + unit. Each pager page has an independent
+     * cache entry, so page A no longer depends on page B being the last city fetched.
      */
     private void tryServeFromCache(@Nullable String errorMessage,
                                    final boolean isCurrentLocation) {
         final TemperatureUnit currentUnit = currentUnit();
-        final String wantedCityName = boundCityName;
-        final boolean isGpsPage = boundIsCurrentLocation;
+        final LastQuery query = lastQuery;
+        if (query == null) {
+            weather.postValue(WeatherUiState.error(errorMessage == null ? "" : errorMessage));
+            return;
+        }
+        final String cacheKey = query.cacheKey(currentUnit);
         diskIo.execute(() -> {
-            CachedSnapshot snap = cachedSnapshotDao.getByIdSync(CachedSnapshot.SINGLE_ROW_KEY);
+            CachedSnapshot snap = cachedSnapshotDao.getByKeySync(cacheKey);
             if (snap == null || snap.weatherJson == null || snap.forecastJson == null
                     || !currentUnit.owmUnitsParam.equals(snap.units)) {
-                weather.postValue(WeatherUiState.error(errorMessage == null ? "" : errorMessage));
-                return;
-            }
-            // Only serve the cached blob if it belongs to this page. The GPS page is a fuzzy
-            // match (any cached city is acceptable when reverse geocoding isn't possible);
-            // other pages must match by city name.
-            boolean matches = isGpsPage
-                    || (wantedCityName != null && wantedCityName.equalsIgnoreCase(snap.cityName));
-            if (!matches) {
                 weather.postValue(WeatherUiState.error(errorMessage == null ? "" : errorMessage));
                 return;
             }
@@ -289,6 +335,7 @@ public class CityViewModel extends AndroidViewModel {
                 List<ForecastItem> items = f.getList();
                 forecast.postValue(ForecastUiState.success(
                         items == null ? Collections.<ForecastItem>emptyList() : items));
+                airQuality.postValue(AirQualityUiState.error(""));
             } catch (Exception parseError) {
                 weather.postValue(WeatherUiState.error(errorMessage == null ? "" : errorMessage));
             }
@@ -324,6 +371,14 @@ public class CityViewModel extends AndroidViewModel {
 
         static LastQuery coord(double lat, double lon) {
             return new LastQuery(null, lat, lon);
+        }
+
+        @NonNull
+        String cacheKey(@NonNull TemperatureUnit unit) {
+            if (city != null) {
+                return "city:" + city.trim().toLowerCase(Locale.ROOT) + ":" + unit.owmUnitsParam;
+            }
+            return String.format(Locale.US, "gps:%.4f,%.4f:%s", lat, lon, unit.owmUnitsParam);
         }
     }
 
