@@ -6,6 +6,9 @@
     <string name="search_action">Tìm kiếm</string>
 
     <!-- Header / current weather -->
+    <string name="current_location_content_description">Vị trí hiện tại</string>
+    <string name="saved_city_content_description">Thành phố đã lưu</string>
+    <string name="weather_icon_content_description">Thời tiết: %1$s</string>
     <string name="loading_uppercase">ĐANG TẢI…</string>
     <string name="updating">Đang cập nhật…</string>
     <string name="placeholder_temperature">--°C</string>
@@ -72,6 +75,10 @@
     <string name="settings_unit_fahrenheit">°F</string>
     <string name="settings_clear_recent">Xoá tìm gần đây</string>
     <string name="settings_recent_cleared">Đã xoá tìm gần đây</string>
+    <string name="settings_weather_alerts_label">Cảnh báo thời tiết xấu</string>
+    <string name="settings_weather_alerts_summary">Nhận thông báo khi vị trí hiện tại có mưa hoặc dông.</string>
+    <string name="settings_weather_alerts_enabled">Đã bật cảnh báo thời tiết</string>
+    <string name="settings_weather_alerts_disabled">Đã tắt cảnh báo thời tiết</string>
     <string name="settings_language_hint">Ngôn ngữ theo ngôn ngữ hệ thống. Đổi tại Cài đặt thiết bị → Ngôn ngữ.</string>
 
     <!-- Offline / cached banner -->

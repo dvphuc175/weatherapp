@@ -29,6 +29,7 @@ import com.google.gson.Gson;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -90,7 +91,8 @@ public class CityViewModel extends AndroidViewModel {
         this.boundIsCurrentLocation = cur != null && cur;
         this.unitListener = (sp, key) -> {
             if (UserPreferences.keyTemperatureUnit().equals(key)) {
-                // Cache is keyed on the old units param; the shared MainViewModel wipes it.
+                // Reload with the new units= param. Snapshots are keyed per unit, so a matching
+                // offline cache can still be used when the network is unavailable.
                 refresh();
             }
         };
@@ -238,9 +240,12 @@ public class CityViewModel extends AndroidViewModel {
         final ForecastResponse f = latestForecast;
         if (w == null || f == null) return;
         final TemperatureUnit unit = currentUnit();
+        final LastQuery query = lastQuery;
+        if (query == null) return;
+        final String cacheKey = query.cacheKey(unit);
         final String cityName = w.getName();
         diskIo.execute(() -> cachedSnapshotDao.upsert(new CachedSnapshot(
-                CachedSnapshot.SINGLE_ROW_KEY,
+                cacheKey,
                 cityName,
                 unit.owmUnitsParam,
                 gson.toJson(w),
@@ -249,28 +254,22 @@ public class CityViewModel extends AndroidViewModel {
     }
 
     /**
-     * Fall back to the single-row cache if the units match AND the cached city name matches
-     * this page's bound city. We don't want page A to render with page B's cached blob just
-     * because B was the last city fetched before going offline.
+     * Fall back to the snapshot for this exact query + unit. Each pager page has an independent
+     * cache entry, so page A no longer depends on page B being the last city fetched.
      */
     private void tryServeFromCache(@Nullable String errorMessage,
                                    final boolean isCurrentLocation) {
         final TemperatureUnit currentUnit = currentUnit();
-        final String wantedCityName = boundCityName;
-        final boolean isGpsPage = boundIsCurrentLocation;
+        final LastQuery query = lastQuery;
+        if (query == null) {
+            weather.postValue(WeatherUiState.error(errorMessage == null ? "" : errorMessage));
+            return;
+        }
+        final String cacheKey = query.cacheKey(currentUnit);
         diskIo.execute(() -> {
-            CachedSnapshot snap = cachedSnapshotDao.getByIdSync(CachedSnapshot.SINGLE_ROW_KEY);
+            CachedSnapshot snap = cachedSnapshotDao.getByKeySync(cacheKey);
             if (snap == null || snap.weatherJson == null || snap.forecastJson == null
                     || !currentUnit.owmUnitsParam.equals(snap.units)) {
-                weather.postValue(WeatherUiState.error(errorMessage == null ? "" : errorMessage));
-                return;
-            }
-            // Only serve the cached blob if it belongs to this page. The GPS page is a fuzzy
-            // match (any cached city is acceptable when reverse geocoding isn't possible);
-            // other pages must match by city name.
-            boolean matches = isGpsPage
-                    || (wantedCityName != null && wantedCityName.equalsIgnoreCase(snap.cityName));
-            if (!matches) {
                 weather.postValue(WeatherUiState.error(errorMessage == null ? "" : errorMessage));
                 return;
             }
@@ -324,6 +323,14 @@ public class CityViewModel extends AndroidViewModel {
 
         static LastQuery coord(double lat, double lon) {
             return new LastQuery(null, lat, lon);
+        }
+
+        @NonNull
+        String cacheKey(@NonNull TemperatureUnit unit) {
+            if (city != null) {
+                return "city:" + city.trim().toLowerCase(Locale.ROOT) + ":" + unit.owmUnitsParam;
+            }
+            return String.format(Locale.US, "gps:%.4f,%.4f:%s", lat, lon, unit.owmUnitsParam);
         }
     }
 
