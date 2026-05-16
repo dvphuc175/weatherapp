@@ -13,8 +13,8 @@ public interface CachedSnapshotDao {
     void upsert(CachedSnapshot snapshot);
 
     @Nullable
-    @Query("SELECT * FROM cached_snapshot WHERE id = :id LIMIT 1")
-    CachedSnapshot getByIdSync(String id);
+    @Query("SELECT * FROM cached_snapshot WHERE id = :cacheKey LIMIT 1")
+    CachedSnapshot getByKeySync(String cacheKey);
 
     @Query("DELETE FROM cached_snapshot")
     void deleteAll();

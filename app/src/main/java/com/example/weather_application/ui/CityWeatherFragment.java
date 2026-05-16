@@ -29,6 +29,10 @@ import com.example.weather_application.DailyForecastAdapter;
 import com.example.weather_application.ForecastAdapter;
 import com.example.weather_application.R;
 import com.example.weather_application.data.UserPreferences;
+import com.example.weather_application.models.AirQualityComponents;
+import com.example.weather_application.models.AirQualityItem;
+import com.example.weather_application.models.AirQualityMain;
+import com.example.weather_application.models.AirQualityResponse;
 import com.example.weather_application.models.CurrentWeather;
 import com.example.weather_application.models.DailyForecast;
 import com.example.weather_application.models.ForecastItem;
@@ -122,9 +126,10 @@ public class CityWeatherFragment extends Fragment {
 
     private TextView tvLocation, tvTemperature, tvDescription, tvHumidity, tvFeelsLike;
     private TextView tvSunrise, tvSunset, tvWind, tvPressure, tvVisibility;
+    private TextView tvAqiValue, tvAqiLevel, tvAqiAdvice, tvPm25, tvPm10;
     private LinearLayout layoutSunCycle;
     private LottieAnimationView lavWeatherIcon, lavLocationIcon;
-    private View cardHumidityFeels, cardWindPressureVisibility;
+    private View cardHumidityFeels, cardAirQuality, cardWindPressureVisibility;
     private MaterialButtonToggleGroup toggleForecastMode;
     private RecyclerView rvForecast, rvDailyForecast;
     private LineChart lineChartTemp;
@@ -221,12 +226,18 @@ public class CityWeatherFragment extends Fragment {
         tvWind = root.findViewById(R.id.tvWind);
         tvPressure = root.findViewById(R.id.tvPressure);
         tvVisibility = root.findViewById(R.id.tvVisibility);
+        tvAqiValue = root.findViewById(R.id.tvAqiValue);
+        tvAqiLevel = root.findViewById(R.id.tvAqiLevel);
+        tvAqiAdvice = root.findViewById(R.id.tvAqiAdvice);
+        tvPm25 = root.findViewById(R.id.tvPm25);
+        tvPm10 = root.findViewById(R.id.tvPm10);
         layoutSunCycle = root.findViewById(R.id.layoutSunCycle);
 
         lavWeatherIcon = root.findViewById(R.id.lavWeatherIcon);
         lavLocationIcon = root.findViewById(R.id.lavLocationIcon);
 
         cardHumidityFeels = root.findViewById(R.id.cardHumidityFeels);
+        cardAirQuality = root.findViewById(R.id.cardAirQuality);
         cardWindPressureVisibility = root.findViewById(R.id.cardWindPressureVisibility);
         toggleForecastMode = root.findViewById(R.id.toggleForecastMode);
         rvForecast = root.findViewById(R.id.rvForecast);
@@ -250,12 +261,14 @@ public class CityWeatherFragment extends Fragment {
         lineChartTemp.setVisibility(dailyMode ? View.GONE : View.VISIBLE);
         rvDailyForecast.setVisibility(dailyMode ? View.VISIBLE : View.GONE);
         cardHumidityFeels.setVisibility(dailyMode ? View.GONE : View.VISIBLE);
+        cardAirQuality.setVisibility(dailyMode ? View.GONE : View.VISIBLE);
         cardWindPressureVisibility.setVisibility(dailyMode ? View.GONE : View.VISIBLE);
     }
 
     private void observeViewModels() {
         viewModel.getWeather().observe(getViewLifecycleOwner(), this::renderWeather);
         viewModel.getForecast().observe(getViewLifecycleOwner(), this::renderForecast);
+        viewModel.getAirQuality().observe(getViewLifecycleOwner(), this::renderAirQuality);
         viewModel.getServingFromCache().observe(getViewLifecycleOwner(), this::renderOfflineBanner);
         viewModel.getCacheSavedAt().observe(getViewLifecycleOwner(), savedAt ->
                 renderOfflineBanner(viewModel.getServingFromCache().getValue()));
@@ -267,6 +280,9 @@ public class CityWeatherFragment extends Fragment {
             applyPlaceholderTemperatures(unit);
             if (forecastAdapter != null) {
                 forecastAdapter.setTemperatureUnit(unit);
+            }
+            if (dailyForecastAdapter != null) {
+                dailyForecastAdapter.setTemperatureUnit(unit);
             }
         });
 
@@ -313,6 +329,9 @@ public class CityWeatherFragment extends Fragment {
         String name = data.getName();
         tvLocation.setText(name == null ? "" : name.toUpperCase(Locale.ROOT));
         lavLocationIcon.setAnimation(state.isCurrentLocation() ? R.raw.anim_location : R.raw.anim_search);
+        lavLocationIcon.setContentDescription(getString(state.isCurrentLocation()
+                ? R.string.current_location_content_description
+                : R.string.saved_city_content_description));
         lavLocationIcon.playAnimation();
 
         CurrentWeather main = data.getMain();
@@ -326,7 +345,10 @@ public class CityWeatherFragment extends Fragment {
         List<WeatherDescription> descriptions = data.getWeather();
         if (descriptions != null && !descriptions.isEmpty()) {
             WeatherDescription first = descriptions.get(0);
-            tvDescription.setText(capitalize(first.getDescription()));
+            String description = capitalize(first.getDescription());
+            tvDescription.setText(description);
+            lavWeatherIcon.setContentDescription(getString(
+                    R.string.weather_icon_content_description, description));
             lavWeatherIcon.setAnimation(WeatherIconMapper.rawForIconCode(first.getIcon()));
             lavWeatherIcon.playAnimation();
             applyDynamicGradient(first.getIcon());
@@ -357,10 +379,73 @@ public class CityWeatherFragment extends Fragment {
         List<DailyForecast> dailyItems = DailyForecastAggregator.aggregate(
                 items, currentCityTimezoneOffsetSec);
         if (dailyForecastAdapter == null) {
-            dailyForecastAdapter = new DailyForecastAdapter(requireContext(), dailyItems);
+            dailyForecastAdapter = new DailyForecastAdapter(requireContext(), dailyItems, currentUnit);
             rvDailyForecast.setAdapter(dailyForecastAdapter);
         } else {
+            dailyForecastAdapter.setTemperatureUnit(currentUnit);
             dailyForecastAdapter.submitList(dailyItems);
+        }
+    }
+
+    private void renderAirQuality(AirQualityUiState state) {
+        if (state.isLoading()) {
+            bindAirQualityUnavailable();
+            return;
+        }
+        AirQualityResponse data = state.getData();
+        if (state.isError() || data == null || data.getList() == null || data.getList().isEmpty()) {
+            bindAirQualityUnavailable();
+            return;
+        }
+
+        AirQualityItem item = data.getList().get(0);
+        if (item == null || item.getMain() == null) {
+            bindAirQualityUnavailable();
+            return;
+        }
+        AirQualityMain main = item.getMain();
+        int aqi = main.getAqi();
+        tvAqiValue.setText(getString(R.string.air_quality_value_format, aqi));
+        tvAqiLevel.setText(airQualityLevel(aqi));
+        tvAqiAdvice.setText(airQualityAdvice(aqi));
+
+        AirQualityComponents components = item.getComponents();
+        if (components == null) {
+            tvPm25.setText(R.string.placeholder_dash);
+            tvPm10.setText(R.string.placeholder_dash);
+        } else {
+            tvPm25.setText(getString(R.string.air_quality_particle_format, components.getPm25()));
+            tvPm10.setText(getString(R.string.air_quality_particle_format, components.getPm10()));
+        }
+    }
+
+    private void bindAirQualityUnavailable() {
+        tvAqiValue.setText(R.string.placeholder_dash);
+        tvAqiLevel.setText(R.string.placeholder_dash);
+        tvAqiAdvice.setText(R.string.air_quality_unavailable);
+        tvPm25.setText(R.string.placeholder_dash);
+        tvPm10.setText(R.string.placeholder_dash);
+    }
+
+    private String airQualityLevel(int aqi) {
+        switch (aqi) {
+            case 1: return getString(R.string.air_quality_good);
+            case 2: return getString(R.string.air_quality_fair);
+            case 3: return getString(R.string.air_quality_moderate);
+            case 4: return getString(R.string.air_quality_poor);
+            case 5: return getString(R.string.air_quality_very_poor);
+            default: return getString(R.string.placeholder_dash);
+        }
+    }
+
+    private String airQualityAdvice(int aqi) {
+        switch (aqi) {
+            case 1: return getString(R.string.air_quality_advice_good);
+            case 2: return getString(R.string.air_quality_advice_fair);
+            case 3: return getString(R.string.air_quality_advice_moderate);
+            case 4: return getString(R.string.air_quality_advice_poor);
+            case 5: return getString(R.string.air_quality_advice_very_poor);
+            default: return getString(R.string.air_quality_unavailable);
         }
     }
 
