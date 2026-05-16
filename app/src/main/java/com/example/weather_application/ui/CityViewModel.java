@@ -75,6 +75,11 @@ public class CityViewModel extends AndroidViewModel {
     private WeatherResponse latestWeather;
     @Nullable
     private ForecastResponse latestForecast;
+    /** Last AQI payload for the active generation. Kept as a field so AQI callbacks and any
+     *  future cache integration have a stable owner; it is intentionally not persisted to Room. */
+    @Nullable
+    private AirQualityResponse latestAirQuality;
+
     /** Listens for unit changes so the page reloads with the new {@code units=} param. */
     @NonNull
     private final SharedPreferences.OnSharedPreferenceChangeListener unitListener;
@@ -194,7 +199,7 @@ public class CityViewModel extends AndroidViewModel {
         cancelInFlight();
         latestWeather = null;
         latestForecast = null;
-        // AQI is intentionally not cached in a backing field; it is a live, non-blocking widget.
+        latestAirQuality = null;
         return ++loadGeneration;
     }
 
@@ -263,6 +268,7 @@ public class CityViewModel extends AndroidViewModel {
             @Override
             public void onSuccess(@NonNull AirQualityResponse data) {
                 if (isStale(gen)) return;
+                latestAirQuality = data;
                 airQuality.postValue(AirQualityUiState.success(data));
             }
 
